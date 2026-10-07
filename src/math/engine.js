@@ -1,4 +1,8 @@
-// Moteur cinématique et mathématique pour le Spirographe Deluxe (Engrenages physiques invariants)
+// Moteur cinématique et mathématique rigoureux pour le Spirographe Deluxe
+// Garantit qu'un stylo ne peut JAMAIS traverser le plateau fixe ni sortir de la roue mobile.
+
+// Pas physique universel d'une dent en pixels, strictement partagé par tous les modules
+export const TOOTH_PITCH = 8.5;
 
 export function gcd(a, b) {
   a = Math.abs(Math.round(a));
@@ -15,11 +19,30 @@ export function lcm(a, b) {
   return (a * b) / gcd(a, b);
 }
 
-// Calcul des statistiques géométriques précises d'un motif
+// Calcul des statistiques géométriques
 export function getPatternStats(fixedGear, mobileGear, mode = 'hypo') {
-  const N = mode === 'epi' ? (fixedGear.outerTeeth || 144) : (fixedGear.innerTeeth || 96);
+  const isRack = fixedGear.category === 'linear' || mode === 'rack';
+  const N = isRack ? (fixedGear.outerTeeth || 80) : (mode === 'epi' ? (fixedGear.outerTeeth || 144) : (fixedGear.innerTeeth || 96));
   const n = mobileGear.teeth || 48;
   const g = gcd(N, n);
+
+  if (isRack) {
+    // Pour une frise / crémaillère : tracé complet fluide aller-retour
+    const passes = Math.max(2, Math.round(n / g));
+    const maxTheta = 2 * Math.PI * passes;
+    return {
+      fixedTeeth: N,
+      wheelTeeth: n,
+      gcd: g,
+      petals: Math.round(N / n) || 2,
+      rotationsAroundRing: passes,
+      totalRevolutions: passes,
+      totalTeethTraveled: N * passes,
+      maxTheta,
+      ratio: (N / n).toFixed(2),
+      symmetryType: `Frise linéaire (${N} dents)`
+    };
+  }
 
   const petals = Math.round(N / g);
   const rotationsAroundRing = Math.round(n / g);
@@ -41,7 +64,7 @@ export function getPatternStats(fixedGear, mobileGear, mode = 'hypo') {
   };
 }
 
-// Rayon effectif d'une roue selon sa forme et son angle propre psi
+// Rayon effectif d'une roue selon sa forme et l'angle polaire psi
 export function getWheelLocalRadius(wheel, psi = 0, baseR) {
   if (!wheel || wheel.shape === 'round') {
     return baseR;
@@ -50,21 +73,21 @@ export function getWheelLocalRadius(wheel, psi = 0, baseR) {
     case 'triangle':
       return baseR * (1 + 0.22 * Math.cos(3 * psi));
     case 'oval':
-      return baseR * (1 + 0.28 * Math.cos(2 * psi));
+      return baseR * (1 + 0.26 * Math.cos(2 * psi));
     case 'bar':
-      return baseR * (1 + 0.38 * Math.abs(Math.cos(psi)) - 0.22 * Math.abs(Math.sin(psi)));
+      return baseR * (1 + 0.36 * Math.abs(Math.cos(psi)) - 0.20 * Math.abs(Math.sin(psi)));
     case 'cross':
-      return baseR * (1 + 0.22 * Math.cos(4 * psi));
+      return baseR * (1 + 0.20 * Math.cos(4 * psi));
     case 'square':
-      return baseR * (1 - 0.16 * Math.cos(4 * psi));
+      return baseR * (1 - 0.15 * Math.cos(4 * psi));
     case 'heart':
-      return baseR * (1 - 0.24 * Math.sin(psi) + 0.12 * Math.cos(2 * psi));
+      return baseR * (1 - 0.22 * Math.sin(psi) + 0.10 * Math.cos(2 * psi));
     case 'star':
-      return baseR * (1 + 0.26 * Math.cos(5 * psi));
+      return baseR * (1 + 0.25 * Math.cos(5 * psi));
     case 'pentagon':
-      return baseR * (1 + 0.16 * Math.cos(5 * psi));
+      return baseR * (1 + 0.15 * Math.cos(5 * psi));
     case 'shuttle':
-      return baseR * (1 + 0.35 * Math.cos(2 * psi));
+      return baseR * (1 + 0.32 * Math.cos(2 * psi));
     default:
       return baseR;
   }
@@ -91,7 +114,7 @@ export function getRingLocalRadius(fixedGear, theta = 0, baseR) {
   }
 }
 
-// Calcul cinématique rigoureux où le plateau physique et la roue ont une taille INVARIANTE
+// Calcul cinématique rigoureux avec contact physique tangentiel exact
 export function calculateGearState({
   fixedGear,
   mobileGear,
@@ -100,23 +123,23 @@ export function calculateGearState({
   mode = 'hypo',
   theta = 0,
   phaseOffset = 0,
-  unitScale = 8.5 // Pas physique d'une dent (constant et invariant)
+  unitScale = TOOTH_PITCH
 }) {
   const isRack = fixedGear.category === 'linear' || mode === 'rack';
   const isEpi = mode === 'epi';
   const pitch = unitScale;
 
-  // DIMENSIONS PHYSIQUES INVARIANTES DE L'ANNEAU :
-  // Le rayon intérieur correspond TOUJOURS à innerTeeth, et l'extérieur à outerTeeth !
+  // DIMENSIONS PHYSIQUES INVARIANTES DU PLATEAU FIXE
   const innerTeeth = fixedGear.innerTeeth || 96;
   const outerTeeth = fixedGear.outerTeeth || 144;
   const ringInnerRadius = (innerTeeth * pitch) / (2 * Math.PI);
   const ringOuterRadius = (outerTeeth * pitch) / (2 * Math.PI);
 
-  // LA ROUE MOBILE NE CHANGE JAMAIS DE TAILLE :
+  // DIMENSION PHYSIQUE INVARIANTE DE LA ROUE MOBILE
   const n = mobileGear.teeth || 48;
   const r0 = (n * pitch) / (2 * Math.PI);
 
+  // SÉLECTION DU TROU
   const holes = mobileGear.holes || [];
   const selectedHole = hole || holes[Math.min(holeIndex, holes.length - 1)] || {
     number: 1,
@@ -124,107 +147,176 @@ export function calculateGearState({
     angleOffset: 0
   };
 
-  // CAS DU RAIL OU DE LA CRÉMAILLÈRE
+  // Coordonnées du trou dans le repère local de la roue (INVARIANTES DANS LA PIÈCE EN PLASTIQUE)
+  const holeAngleOffset = selectedHole.angleOffset || 0;
+  const holeLocalRadius = getWheelLocalRadius(mobileGear, holeAngleOffset, r0);
+  // Le trou est physiquement et strictement à l'intérieur de la pièce (rRatio <= 0.88)
+  const d_hole = Math.min(holeLocalRadius * 0.88, holeLocalRadius * (selectedHole.rRatio || 0.8));
+
+  // CAS 1 : CRÉMAILLÈRE ET RAILS LINÉAIRES (FRISES)
   if (isRack) {
     const rackLength = outerTeeth * pitch;
-    const s = (theta * ringInnerRadius) % (rackLength * 2);
+    const safeMargin = r0 * 0.8;
+    const usableLength = Math.max(100, rackLength - 2 * safeMargin);
+
+    const cycleLength = usableLength * 2;
+    // Progression aller-retour continue le long de la crémaillère
+    const s = ((theta * ringInnerRadius) % cycleLength + cycleLength) % cycleLength;
     let xOffset;
-    if (s <= rackLength) {
-      xOffset = s - rackLength / 2;
+    if (s <= usableLength) {
+      xOffset = s - usableLength / 2;
     } else {
-      xOffset = (2 * rackLength - s) - rackLength / 2;
+      xOffset = (2 * usableLength - s) - usableLength / 2;
     }
 
-    // Crémaillère ondulée ou droite
     const isWave = fixedGear.shapeType === 'wave';
-    const waveY = isWave ? 18 * Math.sin(xOffset / 35) : 0;
+    const rackBaseY = 30; // Position verticale de référence du rail
+    const rackH = 34;
 
-    const wheelCenter = {
-      x: xOffset,
-      y: waveY - (isEpi ? -r0 : r0)
-    };
+    let contactY = rackBaseY;
+    let slope = 0;
+    if (isWave) {
+      contactY = rackBaseY + 18 * Math.sin(xOffset / 35);
+      slope = (18 / 35) * Math.cos(xOffset / 35);
+    }
+    const normLen = Math.hypot(1, slope);
+
+    // Rotation de la roue sans glissement
     const wheelAngle = -(xOffset / r0) + phaseOffset;
 
-    const d = r0 * selectedHole.rRatio;
-    const penLocalAngle = wheelAngle + (selectedHole.angleOffset || 0);
+    // Contact cinématique exact selon le côté
+    let wheelCenter;
+    let contactPoint;
+    if (!isEpi) {
+      // Roue au-dessus du rail
+      const contactPsi = Math.PI / 2 - wheelAngle;
+      const rContact = getWheelLocalRadius(mobileGear, contactPsi, r0);
+      wheelCenter = {
+        x: xOffset + rContact * (slope / normLen),
+        y: contactY - rContact * (1 / normLen)
+      };
+      contactPoint = { x: xOffset, y: contactY };
+    } else {
+      // Roue en dessous du rail
+      const contactPsi = -Math.PI / 2 - wheelAngle;
+      const rContact = getWheelLocalRadius(mobileGear, contactPsi, r0);
+      wheelCenter = {
+        x: xOffset - rContact * (slope / normLen),
+        y: (contactY + rackH) + rContact * (1 / normLen)
+      };
+      contactPoint = { x: xOffset, y: contactY + rackH };
+    }
 
-    const penPos = {
-      x: wheelCenter.x + d * Math.cos(penLocalAngle),
-      y: wheelCenter.y + d * Math.sin(penLocalAngle)
+    // Position du stylet
+    const penGlobalAngle = wheelAngle + holeAngleOffset;
+    let penPos = {
+      x: wheelCenter.x + d_hole * Math.cos(penGlobalAngle),
+      y: wheelCenter.y + d_hole * Math.sin(penGlobalAngle)
     };
+
+    // GARANTIE PHYSIQUE ABSOLUE :
+    // Le stylo ne peut JAMAIS pénétrer à l'intérieur du corps plastique du rail !
+    if (!isEpi) {
+      const surfaceY = isWave ? (rackBaseY + 18 * Math.sin(penPos.x / 35)) : rackBaseY;
+      if (penPos.y > surfaceY - 2.0) {
+        penPos.y = surfaceY - 2.0;
+      }
+    } else {
+      const bottomSurfaceY = (isWave ? (rackBaseY + 18 * Math.sin(penPos.x / 35)) : rackBaseY) + rackH;
+      if (penPos.y < bottomSurfaceY + 2.0) {
+        penPos.y = bottomSurfaceY + 2.0;
+      }
+    }
 
     return {
       wheelCenter,
       wheelAngle,
       penPos,
-      contactPoint: { x: wheelCenter.x, y: waveY },
+      contactPoint,
       wheelRadius: r0,
       ringInnerRadius,
       ringOuterRadius,
-      ringRadius: isEpi ? ringOuterRadius : ringInnerRadius,
+      ringRadius: ringInnerRadius,
       selectedHole,
       pitch,
       mode
     };
   }
 
-  // CAS DES ANNEAUX ET PLATEAUX FERMÉS
-  // En mode Intérieur (hypo) : la piste de contact est la paroi intérieure ringInnerRadius
-  // En mode Extérieur (epi) : la piste de contact est la paroi extérieure ringOuterRadius
+  // CAS 2 : ANNEAUX ET PLATEAUX FERMÉS
   const activeTeeth = isEpi ? outerTeeth : innerTeeth;
   const baseContactR = isEpi ? ringOuterRadius : ringInnerRadius;
-  const contactR = getRingLocalRadius(fixedGear, theta, baseContactR);
+  const effectiveTheta = theta + phaseOffset;
+  const contactR = getRingLocalRadius(fixedGear, effectiveTheta, baseContactR);
 
-  let wheelCenter;
+  // Point de contact physique sur le plateau fixe
+  const contactPoint = {
+    x: contactR * Math.cos(effectiveTheta),
+    y: contactR * Math.sin(effectiveTheta)
+  };
+
+  // Rotation sans glissement de la roue
   let wheelAngle;
-  let contactPoint;
-
   if (isEpi) {
-    // ÉPITROCHOÏDE : la roue roule sur l'EXTÉRIEUR de l'anneau (sur ringOuterRadius)
-    const distCenter = contactR + r0;
-    const effectiveTheta = theta + phaseOffset;
-
-    wheelCenter = {
-      x: distCenter * Math.cos(effectiveTheta),
-      y: distCenter * Math.sin(effectiveTheta)
-    };
-
-    contactPoint = {
-      x: contactR * Math.cos(effectiveTheta),
-      y: contactR * Math.sin(effectiveTheta)
-    };
-
-    // Rotation propre sans glissement sur les dents extérieures
     const rollingAngle = (activeTeeth / n) * theta;
     wheelAngle = effectiveTheta + rollingAngle;
   } else {
-    // HYPOTROCHOÏDE : la roue roule à l'INTÉRIEUR de l'anneau (sur ringInnerRadius)
-    const distCenter = Math.max(5, contactR - r0);
-    const effectiveTheta = theta + phaseOffset;
-
-    wheelCenter = {
-      x: distCenter * Math.cos(effectiveTheta),
-      y: distCenter * Math.sin(effectiveTheta)
-    };
-
-    contactPoint = {
-      x: contactR * Math.cos(effectiveTheta),
-      y: contactR * Math.sin(effectiveTheta)
-    };
-
-    // Rotation propre sans glissement sur les dents intérieures
     const rollingAngle = (activeTeeth / n) * theta;
     wheelAngle = effectiveTheta - rollingAngle;
   }
 
-  const localR = getWheelLocalRadius(mobileGear, wheelAngle, r0);
-  const d = localR * selectedHole.rRatio;
-  const penAngle = wheelAngle + (selectedHole.angleOffset || 0);
+  // Rayon de la roue au point de contact avec le plateau
+  const contactPsi = isEpi ? (effectiveTheta - wheelAngle + Math.PI) : (effectiveTheta - wheelAngle);
+  const rContact = getWheelLocalRadius(mobileGear, contactPsi, r0);
 
-  const penPos = {
-    x: wheelCenter.x + d * Math.cos(penAngle),
-    y: wheelCenter.y + d * Math.sin(penAngle)
+  // Position du centre de la roue :
+  let wheelCenter;
+  if (isEpi) {
+    const centerDist = contactR + rContact;
+    wheelCenter = {
+      x: centerDist * Math.cos(effectiveTheta),
+      y: centerDist * Math.sin(effectiveTheta)
+    };
+  } else {
+    // La roue est strictement à l'intérieur du trou du plateau
+    const centerDist = Math.max(2, contactR - rContact);
+    wheelCenter = {
+      x: centerDist * Math.cos(effectiveTheta),
+      y: centerDist * Math.sin(effectiveTheta)
+    };
+  }
+
+  // Position absolue de la pointe du stylet (fixée dans la roue en plastique)
+  const penGlobalAngle = wheelAngle + holeAngleOffset;
+  let penPos = {
+    x: wheelCenter.x + d_hole * Math.cos(penGlobalAngle),
+    y: wheelCenter.y + d_hole * Math.sin(penGlobalAngle)
   };
+
+  // GARANTIE PHYSIQUE ABSOLUE :
+  // Le stylo ne peut JAMAIS dessiner sous le plastique du plateau fixe !
+  const penDist = Math.hypot(penPos.x, penPos.y);
+  const penAngle = Math.atan2(penPos.y, penPos.x);
+
+  if (!isEpi) {
+    // Mode Hypotrochoïde : le stylo est strictement dans l'ouverture intérieure
+    const ringBoundaryAtPen = getRingLocalRadius(fixedGear, penAngle, ringInnerRadius);
+    const maxAllowedDist = ringBoundaryAtPen - 2.0; // Marge physique de 2px
+    if (penDist > maxAllowedDist) {
+      const scale = maxAllowedDist / (penDist || 1);
+      penPos.x *= scale;
+      penPos.y *= scale;
+    }
+  } else {
+    // Mode Épitrochoïde : le stylo est strictement à l'extérieur du plateau
+    const ringBoundaryAtPen = getRingLocalRadius(fixedGear, penAngle, ringOuterRadius);
+    const minAllowedDist = ringBoundaryAtPen + 2.0; // Marge physique de 2px
+    if (penDist < minAllowedDist) {
+      const scale = minAllowedDist / (penDist || 1);
+      penPos.x *= scale;
+      penPos.y *= scale;
+    }
+  }
 
   return {
     wheelCenter,
@@ -241,7 +333,7 @@ export function calculateGearState({
   };
 }
 
-// Génération de la trajectoire complète échantillonnée
+// Génération de la trajectoire échantillonnée complète
 export function generateFullTrajectory({
   fixedGear,
   mobileGear,
@@ -249,7 +341,7 @@ export function generateFullTrajectory({
   hole = null,
   mode = 'hypo',
   phaseOffset = 0,
-  unitScale = 8.5,
+  unitScale = TOOTH_PITCH,
   samplesPerPetal = 90
 }) {
   const stats = getPatternStats(fixedGear, mobileGear, mode);

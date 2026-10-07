@@ -1,7 +1,7 @@
 // Gestionnaire d'état réactif et d'historique du Spirographe Deluxe
 
 import { FIXED_GEARS, MOBILE_WHEELS, PEN_STYLES, DELUXE_COLORS, PAPER_THEMES } from '../math/gears.js';
-import { generateFullTrajectory } from '../math/engine.js';
+import { generateFullTrajectory, TOOTH_PITCH } from '../math/engine.js';
 import { sounds } from '../audio/sound.js';
 
 export class StudioState {
@@ -73,7 +73,7 @@ export class StudioState {
       hole,
       mode,
       phaseOffset: phaseOffsetRad,
-      unitScale: 14.0
+      unitScale: TOOTH_PITCH
     });
 
     const layerId = `layer-${Date.now()}-${Math.floor(Math.random() * 1000)}`;
@@ -151,7 +151,7 @@ export class StudioState {
         holeIndex: baseLayer.holeIndex,
         mode: baseLayer.mode,
         phaseOffset: offsetRad,
-        unitScale: 14.0
+        unitScale: TOOTH_PITCH
       });
 
       this.layers.push({
@@ -278,7 +278,7 @@ export class StudioState {
         hole,
         mode: cfg.mode,
         phaseOffset: phaseRad,
-        unitScale: 14.0
+        unitScale: TOOTH_PITCH
       });
 
       this.layers.push({

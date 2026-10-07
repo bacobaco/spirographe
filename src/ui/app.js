@@ -2,7 +2,7 @@
 
 import { studioState } from '../state/state.js';
 import { FIXED_GEARS, MOBILE_WHEELS, PEN_STYLES, DELUXE_COLORS, PAPER_THEMES } from '../math/gears.js';
-import { calculateGearState, getWheelLocalRadius } from '../math/engine.js';
+import { calculateGearState, getWheelLocalRadius, TOOTH_PITCH } from '../math/engine.js';
 import { CanvasRenderer } from '../render/canvasRenderer.js';
 import { sounds } from '../audio/sound.js';
 import { PRESETS } from '../presets/presets.js';
@@ -103,7 +103,7 @@ export class SpiroStudioApp {
         mode: activeLayer.mode,
         theta: currentTheta,
         phaseOffset: phaseRad,
-        unitScale: 8.5
+        unitScale: TOOTH_PITCH
       });
     }
 

@@ -306,42 +306,52 @@ export class CanvasRenderer {
     if (fixedGear.category === 'linear') {
       const rackLen = outerTeeth * state.pitch;
       const isWave = fixedGear.shapeType === 'wave';
+      const rackBaseY = 30; // Strictement synchronisé avec engine.js
       const rackH = 34;
 
-      ctx.fillStyle = this.hexToRgba(color, 0.2);
-      ctx.strokeStyle = this.hexToRgba(color, 0.7);
+      ctx.fillStyle = this.hexToRgba(color, 0.22);
+      ctx.strokeStyle = this.hexToRgba(color, 0.75);
       ctx.lineWidth = 2;
 
       ctx.beginPath();
       if (isWave) {
         for (let x = -rackLen / 2; x <= rackLen / 2; x += 5) {
-          const y = 18 * Math.sin(x / 35);
+          const y = rackBaseY + 18 * Math.sin(x / 35);
           if (x === -rackLen / 2) ctx.moveTo(x, y);
           else ctx.lineTo(x, y);
         }
         for (let x = rackLen / 2; x >= -rackLen / 2; x -= 5) {
-          const y = 18 * Math.sin(x / 35) + rackH;
+          const y = rackBaseY + 18 * Math.sin(x / 35) + rackH;
           ctx.lineTo(x, y);
         }
       } else {
-        ctx.roundRect(-rackLen / 2, -rackH / 2, rackLen, rackH, 6);
+        // Le corps du rail est strictement situé à y >= rackBaseY
+        ctx.roundRect(-rackLen / 2, rackBaseY, rackLen, rackH, 6);
       }
       ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      // Dents
+      // Dents le long de la ligne de contact
       ctx.strokeStyle = this.hexToRgba(color, 0.85);
       ctx.lineWidth = 1.2;
-      const pitch = rackLen / outerTeeth;
+      const pitch = state.pitch;
       for (let i = 0; i <= outerTeeth; i++) {
         const x = -rackLen / 2 + i * pitch;
-        const yTop = isWave ? 18 * Math.sin(x / 35) : -rackH / 2;
+        const yTop = isWave ? (rackBaseY + 18 * Math.sin(x / 35)) : rackBaseY;
         ctx.beginPath();
         ctx.moveTo(x, yTop);
-        ctx.lineTo(x, yTop - 5);
+        ctx.lineTo(x, yTop - 4);
         ctx.stroke();
       }
+
+      // Gravure sur la règle
+      ctx.fillStyle = paperTheme.dark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.4)';
+      ctx.font = '600 11px Outfit, sans-serif';
+      ctx.textAlign = 'center';
+      ctx.textBaseline = 'middle';
+      ctx.fillText(`${outerTeeth} DENTS • DELUXE RACK`, 0, rackBaseY + rackH / 2);
+
       ctx.restore();
       return;
     }
