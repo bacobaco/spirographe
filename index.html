@@ -1,0 +1,207 @@
+<!doctype html>
+<html lang="fr">
+  <head>
+    <meta charset="UTF-8" />
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><circle cx='50' cy='50' r='45' fill='%2306b6d4'/><circle cx='50' cy='50' r='25' fill='%230c0f17'/></svg>" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spirographe Deluxe Studio • Le Jeu de Dessin Géométrique</title>
+    <meta name="description" content="Simulateur professionnel de Spirographe Deluxe avec engrenages en acrylique, pointes de stylet variées, plateaux et roues multiples, décalage angulaire et export SVG/PNG." />
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@500;700&family=Outfit:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- HEADER PRINCIPAL -->
+      <header class="top-header">
+        <div class="brand-section">
+          <div class="brand-icon-wrapper">
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="9"></circle>
+              <circle cx="12" cy="12" r="3"></circle>
+              <path d="M12 3v3M12 18v3M3 12h3M18 12h3"></path>
+            </svg>
+          </div>
+          <div>
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <h1 class="brand-title">SPIROGRAPHE</h1>
+              <span class="brand-badge">DELUXE STUDIO</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="header-actions">
+          <!-- Modèles de démonstration -->
+          <button class="header-btn" id="btn-presets" title="Galerie de créations préréglées">
+            <span>✨</span> Modèles Préréglés
+          </button>
+
+          <!-- Générateur de Rosette automatique -->
+          <button class="header-btn btn-rosette" id="btn-rosette-gen" title="Générer une rosette kaléidoscopique multi-branches">
+            <span>🌸</span> Multiplier Rosette
+          </button>
+
+          <!-- Tiroir des Calques -->
+          <button class="header-btn" id="btn-layers-toggle" title="Gérer les couches de dessin">
+            <span>🎨</span> Calques <span class="section-badge" id="layers-count-badge" style="margin-left: 4px;">1</span>
+          </button>
+
+          <!-- Thème du papier -->
+          <div style="display: flex; align-items: center; gap: 6px; margin: 0 4px;">
+            <select id="paper-theme-select" class="header-btn" style="cursor: pointer; outline: none;">
+              <option value="white-paper">Papier Blanc Pur</option>
+              <option value="black-paper">Papier Noir Néon</option>
+              <option value="kraft-paper">Papier Kraft Vintage</option>
+              <option value="blueprint">Calque Bleu Ingénieur</option>
+            </select>
+          </div>
+
+          <!-- Mute Son -->
+          <button class="icon-btn" id="btn-mute" title="Activer/Couper le son mécanique">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+              <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+            </svg>
+          </button>
+
+          <!-- Export PNG HD -->
+          <button class="header-btn btn-primary" id="btn-export-png" title="Télécharger l'image en haute résolution">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            PNG HD
+          </button>
+
+          <!-- Export SVG Vectoriel -->
+          <button class="header-btn" id="btn-export-svg" title="Télécharger le fichier vectoriel SVG (idéal découpe laser & traceur)">
+            SVG
+          </button>
+        </div>
+      </header>
+
+      <!-- ESPACE DE TRAVAIL PRINCIPAL -->
+      <main class="main-workspace">
+        <!-- BOÎTE DELUXE (PANNEAU LATÉRAL GAUCHE) -->
+        <aside class="sidebar-box" id="sidebar-box">
+          <nav class="sidebar-tabs" id="sidebar-tabs"></nav>
+          <div class="sidebar-content custom-scroll" id="sidebar-dynamic-content"></div>
+        </aside>
+
+        <!-- PLANCHE À DESSIN (CANVAS CENTRAL) -->
+        <section class="canvas-area">
+          <canvas id="spiro-canvas"></canvas>
+
+          <!-- HUD STATISTIQUES GÉOMÉTRIQUES -->
+          <div class="canvas-hud-info">
+            <div style="font-size: 11px; font-weight: 700; text-transform: uppercase; color: var(--text-muted); letter-spacing: 0.5px; border-bottom: 1px solid rgba(255,255,255,0.06); padding-bottom: 4px; margin-bottom: 2px;">
+              Harmonie Géométrique
+            </div>
+            <div class="info-stat-row">
+              <span class="info-stat-label">Rapport Dents (R/r) :</span>
+              <span class="info-stat-value" id="stat-ratio">96 / 52</span>
+            </div>
+            <div class="info-stat-row">
+              <span class="info-stat-label">Symétrie & Lobes :</span>
+              <span class="info-stat-value" id="stat-petals">24 branches</span>
+            </div>
+            <div class="info-stat-row">
+              <span class="info-stat-label">Période fermée :</span>
+              <span class="info-stat-value" id="stat-turns">13 tours</span>
+            </div>
+            <div class="info-stat-row">
+              <span class="info-stat-label">Pas d'engrenage :</span>
+              <span class="info-stat-value" id="stat-teeth">1248 pas</span>
+            </div>
+          </div>
+
+          <!-- HUD CONTRÔLES FLOTTANTS AU BAS DU CANVAS -->
+          <div class="canvas-hud-controls">
+            <!-- Bouton Play / Pause Principal -->
+            <button class="play-main-btn" id="btn-play-pause" title="Lancer / Mettre en pause le tracé (Espace)">
+              <svg width="22" height="22" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M8 5v14l11-7z"></path>
+              </svg>
+            </button>
+
+            <!-- Tracé Instantané -->
+            <button class="hud-pill-btn" id="btn-instant-draw" title="Tracer instantanément tout le motif (Entrée)">
+              ⚡ Tout Tracer
+            </button>
+
+            <!-- Valider et ajouter au calque -->
+            <button class="hud-pill-btn btn-commit" id="btn-commit-layer" title="Figer ce tracé et en commencer un autre par-dessus (Touche C)">
+              ➕ Figer Calque
+            </button>
+
+            <div style="width: 1px; height: 26px; background: rgba(255,255,255,0.12); margin: 0 4px;"></div>
+
+            <!-- Vitesse d'animation -->
+            <div class="speed-control-wrap">
+              <span>Vitesse:</span>
+              <input type="range" id="speed-slider" class="speed-slider" min="0.3" max="10" step="0.2" value="1.5">
+              <span id="speed-val" style="font-family: var(--font-mono); font-weight: 700; width: 34px;">1.5x</span>
+            </div>
+
+            <div style="width: 1px; height: 26px; background: rgba(255,255,255,0.12); margin: 0 4px;"></div>
+
+            <!-- Décalage d'angle (Phase) -->
+            <div class="speed-control-wrap">
+              <span>Angle:</span>
+              <input type="range" id="phase-slider" class="speed-slider" min="0" max="360" step="1" value="0">
+              <span id="phase-val" style="font-family: var(--font-mono); font-weight: 700; width: 34px;">0°</span>
+            </div>
+
+            <div style="width: 1px; height: 26px; background: rgba(255,255,255,0.12); margin: 0 4px;"></div>
+
+            <!-- Afficher/Masquer les roues physiques en acrylique -->
+            <button class="hud-pill-btn active" id="btn-toggle-gears" title="Afficher ou masquer les engrenages transparents en acrylique">
+              ⚙️ Roues
+            </button>
+
+            <!-- Afficher/Masquer la grille repère -->
+            <button class="hud-pill-btn active" id="btn-toggle-grid" title="Afficher ou masquer la grille polaire">
+              📐 Grille
+            </button>
+
+            <!-- Effacer -->
+            <button class="hud-pill-btn" id="btn-clear-canvas" title="Effacer l'ensemble de la feuille" style="color: #f87171;">
+              🗑️ Effacer
+            </button>
+
+            <!-- Indicateur d'avancement -->
+            <span id="hud-progress-val" style="font-family: var(--font-mono); font-size: 11px; font-weight: 700; color: var(--accent-cyan); margin-left: 6px;">0%</span>
+          </div>
+        </section>
+
+        <!-- TIROIR LATÉRAL DES CALQUES (DROITE) -->
+        <aside class="layers-drawer" id="layers-drawer">
+          <div class="modal-header">
+            <span class="modal-title" style="font-size: 15px;">Calques & Motifs</span>
+            <button class="icon-btn" id="btn-close-layers">✕</button>
+          </div>
+          <div class="layers-list custom-scroll" id="layers-list"></div>
+        </aside>
+      </main>
+
+      <!-- MODALE DES MODÈLES PRÉRÉGLÉS -->
+      <div class="modal-overlay" id="presets-modal">
+        <div class="modal-box">
+          <div class="modal-header">
+            <h2 class="modal-title">Galerie de Modèles Préréglés</h2>
+            <button class="icon-btn btn-close-modal">✕</button>
+          </div>
+          <div class="modal-body custom-scroll">
+            <div class="presets-grid" id="presets-grid"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.js"></script>
+  </body>
+</html>
