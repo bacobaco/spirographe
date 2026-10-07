@@ -1,4 +1,4 @@
-// Moteur mathématique et cinématique pour le Spirographe Deluxe (Coordonnées centrées en (0,0))
+// Moteur cinématique et mathématique pour le Spirographe Deluxe (Engrenages physiques invariants)
 
 export function gcd(a, b) {
   a = Math.abs(Math.round(a));
@@ -48,17 +48,23 @@ export function getWheelLocalRadius(wheel, psi = 0, baseR) {
   }
   switch (wheel.shape) {
     case 'triangle':
-      // 3 lobes arrondis
-      return baseR * (1 + 0.18 * Math.cos(3 * psi));
+      return baseR * (1 + 0.22 * Math.cos(3 * psi));
     case 'oval':
-      // Ellipse à 2 axes
-      return baseR * (1 + 0.22 * Math.cos(2 * psi));
+      return baseR * (1 + 0.28 * Math.cos(2 * psi));
     case 'bar':
-      // Bâtonnet allongé
-      return baseR * (1 + 0.35 * Math.abs(Math.cos(psi)) - 0.2 * Math.abs(Math.sin(psi)));
+      return baseR * (1 + 0.38 * Math.abs(Math.cos(psi)) - 0.22 * Math.abs(Math.sin(psi)));
     case 'cross':
-      // Croix à 4 branches
-      return baseR * (1 + 0.16 * Math.cos(4 * psi));
+      return baseR * (1 + 0.22 * Math.cos(4 * psi));
+    case 'square':
+      return baseR * (1 - 0.16 * Math.cos(4 * psi));
+    case 'heart':
+      return baseR * (1 - 0.24 * Math.sin(psi) + 0.12 * Math.cos(2 * psi));
+    case 'star':
+      return baseR * (1 + 0.26 * Math.cos(5 * psi));
+    case 'pentagon':
+      return baseR * (1 + 0.16 * Math.cos(5 * psi));
+    case 'shuttle':
+      return baseR * (1 + 0.35 * Math.cos(2 * psi));
     default:
       return baseR;
   }
@@ -71,17 +77,21 @@ export function getRingLocalRadius(fixedGear, theta = 0, baseR) {
   }
   switch (fixedGear.id) {
     case 'ring-oval-144':
-      // Stade ovale
-      return baseR * (1 + 0.18 * Math.cos(2 * theta));
+      return baseR * (1 + 0.20 * Math.cos(2 * theta));
+    case 'ring-triangle-120':
+      return baseR * (1 + 0.18 * Math.cos(3 * theta));
+    case 'ring-square-128':
+      return baseR * (1 - 0.14 * Math.cos(4 * theta));
+    case 'ring-heart-120':
+      return baseR * (1 - 0.22 * Math.sin(theta) + 0.10 * Math.cos(2 * theta));
     case 'ring-clover-120':
-      // Profil trèfle à 4 courbures
-      return baseR * (1 + 0.10 * Math.cos(4 * theta));
+      return baseR * (1 + 0.14 * Math.cos(4 * theta));
     default:
       return baseR;
   }
 }
 
-// Calcul cinématique de l'état complet centré à l'origine (0, 0)
+// Calcul cinématique rigoureux où le plateau physique et la roue ont une taille INVARIANTE
 export function calculateGearState({
   fixedGear,
   mobileGear,
@@ -89,18 +99,22 @@ export function calculateGearState({
   hole = null,
   mode = 'hypo',
   theta = 0,
-  phaseOffset = 0, // Décalage angulaire en radians
-  unitScale = 14.0 // Échelle en pixels par pas de dent pour remplir élégamment la feuille
+  phaseOffset = 0,
+  unitScale = 8.5 // Pas physique d'une dent (constant et invariant)
 }) {
   const isRack = fixedGear.category === 'linear' || mode === 'rack';
   const isEpi = mode === 'epi';
-
-  // Le pas d'une dent en pixels
   const pitch = unitScale;
-  const N = isEpi ? (fixedGear.outerTeeth || 144) : (fixedGear.innerTeeth || 96);
-  const n = mobileGear.teeth || 48;
 
-  const R0 = (N * pitch) / (2 * Math.PI);
+  // DIMENSIONS PHYSIQUES INVARIANTES DE L'ANNEAU :
+  // Le rayon intérieur correspond TOUJOURS à innerTeeth, et l'extérieur à outerTeeth !
+  const innerTeeth = fixedGear.innerTeeth || 96;
+  const outerTeeth = fixedGear.outerTeeth || 144;
+  const ringInnerRadius = (innerTeeth * pitch) / (2 * Math.PI);
+  const ringOuterRadius = (outerTeeth * pitch) / (2 * Math.PI);
+
+  // LA ROUE MOBILE NE CHANGE JAMAIS DE TAILLE :
+  const n = mobileGear.teeth || 48;
   const r0 = (n * pitch) / (2 * Math.PI);
 
   const holes = mobileGear.holes || [];
@@ -110,19 +124,24 @@ export function calculateGearState({
     angleOffset: 0
   };
 
+  // CAS DU RAIL OU DE LA CRÉMAILLÈRE
   if (isRack) {
-    // Crémaillère droite centrée à (0, 0)
-    const rackLength = N * pitch;
-    const s = (theta * R0) % (rackLength * 2);
+    const rackLength = outerTeeth * pitch;
+    const s = (theta * ringInnerRadius) % (rackLength * 2);
     let xOffset;
     if (s <= rackLength) {
       xOffset = s - rackLength / 2;
     } else {
       xOffset = (2 * rackLength - s) - rackLength / 2;
     }
+
+    // Crémaillère ondulée ou droite
+    const isWave = fixedGear.shapeType === 'wave';
+    const waveY = isWave ? 18 * Math.sin(xOffset / 35) : 0;
+
     const wheelCenter = {
       x: xOffset,
-      y: -(isEpi ? -r0 : r0)
+      y: waveY - (isEpi ? -r0 : r0)
     };
     const wheelAngle = -(xOffset / r0) + phaseOffset;
 
@@ -138,25 +157,31 @@ export function calculateGearState({
       wheelCenter,
       wheelAngle,
       penPos,
-      contactPoint: { x: wheelCenter.x, y: 0 },
+      contactPoint: { x: wheelCenter.x, y: waveY },
       wheelRadius: r0,
-      ringRadius: R0,
+      ringInnerRadius,
+      ringOuterRadius,
+      ringRadius: isEpi ? ringOuterRadius : ringInnerRadius,
       selectedHole,
-      pitch
+      pitch,
+      mode
     };
   }
 
-  // Anneaux circulaires ou ondulés
-  const R = getRingLocalRadius(fixedGear, theta, R0);
-  const r = r0;
+  // CAS DES ANNEAUX ET PLATEAUX FERMÉS
+  // En mode Intérieur (hypo) : la piste de contact est la paroi intérieure ringInnerRadius
+  // En mode Extérieur (epi) : la piste de contact est la paroi extérieure ringOuterRadius
+  const activeTeeth = isEpi ? outerTeeth : innerTeeth;
+  const baseContactR = isEpi ? ringOuterRadius : ringInnerRadius;
+  const contactR = getRingLocalRadius(fixedGear, theta, baseContactR);
 
   let wheelCenter;
   let wheelAngle;
   let contactPoint;
 
   if (isEpi) {
-    // Épitrochoïde : la roue roule sur l'extérieur de l'anneau
-    const distCenter = R + r;
+    // ÉPITROCHOÏDE : la roue roule sur l'EXTÉRIEUR de l'anneau (sur ringOuterRadius)
+    const distCenter = contactR + r0;
     const effectiveTheta = theta + phaseOffset;
 
     wheelCenter = {
@@ -165,15 +190,16 @@ export function calculateGearState({
     };
 
     contactPoint = {
-      x: R * Math.cos(effectiveTheta),
-      y: R * Math.sin(effectiveTheta)
+      x: contactR * Math.cos(effectiveTheta),
+      y: contactR * Math.sin(effectiveTheta)
     };
 
-    const rollingAngle = (N / n) * theta;
+    // Rotation propre sans glissement sur les dents extérieures
+    const rollingAngle = (activeTeeth / n) * theta;
     wheelAngle = effectiveTheta + rollingAngle;
   } else {
-    // Hypotrochoïde : la roue roule à l'intérieur de l'anneau
-    const distCenter = Math.max(5, R - r);
+    // HYPOTROCHOÏDE : la roue roule à l'INTÉRIEUR de l'anneau (sur ringInnerRadius)
+    const distCenter = Math.max(5, contactR - r0);
     const effectiveTheta = theta + phaseOffset;
 
     wheelCenter = {
@@ -182,15 +208,16 @@ export function calculateGearState({
     };
 
     contactPoint = {
-      x: R * Math.cos(effectiveTheta),
-      y: R * Math.sin(effectiveTheta)
+      x: contactR * Math.cos(effectiveTheta),
+      y: contactR * Math.sin(effectiveTheta)
     };
 
-    const rollingAngle = (N / n) * theta;
+    // Rotation propre sans glissement sur les dents intérieures
+    const rollingAngle = (activeTeeth / n) * theta;
     wheelAngle = effectiveTheta - rollingAngle;
   }
 
-  const localR = getWheelLocalRadius(mobileGear, wheelAngle, r);
+  const localR = getWheelLocalRadius(mobileGear, wheelAngle, r0);
   const d = localR * selectedHole.rRatio;
   const penAngle = wheelAngle + (selectedHole.angleOffset || 0);
 
@@ -204,14 +231,17 @@ export function calculateGearState({
     wheelAngle,
     penPos,
     contactPoint,
-    wheelRadius: r,
-    ringRadius: R,
+    wheelRadius: r0,
+    ringInnerRadius,
+    ringOuterRadius,
+    ringRadius: contactR,
     selectedHole,
-    pitch
+    pitch,
+    mode
   };
 }
 
-// Génération de la trajectoire complète en coordonnées locales centrées en (0, 0)
+// Génération de la trajectoire complète échantillonnée
 export function generateFullTrajectory({
   fixedGear,
   mobileGear,
@@ -219,8 +249,8 @@ export function generateFullTrajectory({
   hole = null,
   mode = 'hypo',
   phaseOffset = 0,
-  unitScale = 14.0,
-  samplesPerPetal = 80
+  unitScale = 8.5,
+  samplesPerPetal = 90
 }) {
   const stats = getPatternStats(fixedGear, mobileGear, mode);
   const totalSamples = Math.min(25000, Math.max(1200, stats.petals * samplesPerPetal));

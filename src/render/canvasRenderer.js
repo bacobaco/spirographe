@@ -1,4 +1,4 @@
-// Moteur de rendu Canvas 2D centré en (0,0) pour le Spirographe Deluxe
+// Moteur de rendu Canvas 2D haute fidélité avec engrenages physiques invariants et formes spéciales
 
 import { getRingLocalRadius, getWheelLocalRadius } from '../math/engine.js';
 import { FIXED_GEARS, MOBILE_WHEELS } from '../math/gears.js';
@@ -13,7 +13,6 @@ export class CanvasRenderer {
     this.showGrid = true;
     this.isDraggingWheel = false;
 
-    // Dimensions logiques
     this.width = 800;
     this.height = 800;
     this.center = { x: 400, y: 400 };
@@ -38,7 +37,6 @@ export class CanvasRenderer {
     this.ctx.clearRect(0, 0, this.width, this.height);
   }
 
-  // Rendu de la scène centrée en (0, 0)
   renderScene({
     paperTheme,
     layers = [],
@@ -55,11 +53,10 @@ export class CanvasRenderer {
     this.clear();
 
     this.ctx.save();
-    // Translation vers le centre du canvas
     this.ctx.translate(this.center.x, this.center.y);
     this.ctx.scale(this.zoom, this.zoom);
 
-    // 1. Fond papier et texture centrés
+    // 1. Fond papier d'art
     this.renderPaper(paperTheme);
 
     // 2. Grille polaire en filigrane
@@ -87,7 +84,6 @@ export class CanvasRenderer {
     this.ctx.restore();
   }
 
-  // Feuille de dessin centrée
   renderPaper(paperTheme) {
     const ctx = this.ctx;
     const size = Math.min(this.width, this.height) - 30;
@@ -108,7 +104,6 @@ export class CanvasRenderer {
     ctx.lineWidth = 1;
     ctx.stroke();
 
-    // Vignette périphérique
     const grad = ctx.createRadialGradient(0, 0, size * 0.35, 0, 0, size * 0.65);
     grad.addColorStop(0, 'rgba(0,0,0,0)');
     grad.addColorStop(1, paperTheme.dark ? 'rgba(0,0,0,0.35)' : 'rgba(0,0,0,0.04)');
@@ -119,7 +114,6 @@ export class CanvasRenderer {
     ctx.fill();
   }
 
-  // Grille polaire centrée à (0, 0)
   renderGrid(paperTheme) {
     const ctx = this.ctx;
     ctx.save();
@@ -141,7 +135,6 @@ export class CanvasRenderer {
       ctx.stroke();
     }
 
-    // Croix repère au centre
     ctx.strokeStyle = paperTheme.dark ? 'rgba(255, 255, 255, 0.15)' : 'rgba(0, 0, 0, 0.15)';
     ctx.lineWidth = 1.2;
     ctx.beginPath();
@@ -154,7 +147,6 @@ export class CanvasRenderer {
     ctx.restore();
   }
 
-  // Rendu de trajectoire
   renderLayerPath(layer) {
     const points = layer.points;
     if (!points || points.length < 2) return;
@@ -299,72 +291,111 @@ export class CanvasRenderer {
     this.renderPenStylus(state, layer.color);
   }
 
+  // Rendu du plateau fixe : la pièce en plastique conserve EXACTEMENT sa géométrie en hypo et en epi !
   renderFixedGearVisual(fixedGear, state, paperTheme) {
     const ctx = this.ctx;
-    const baseR = state.ringRadius;
+    const innerR = state.ringInnerRadius;
+    const outerR = state.ringOuterRadius;
+    const innerTeeth = fixedGear.innerTeeth || 96;
+    const outerTeeth = fixedGear.outerTeeth || 144;
+    const color = fixedGear.color || '#38bdf8';
 
     ctx.save();
 
+    // Cas d'un rail ou d'une crémaillère linéaire
     if (fixedGear.category === 'linear') {
-      const rackLen = baseR * 2 * Math.PI;
-      const rackH = 36;
-      ctx.fillStyle = 'rgba(251, 191, 36, 0.18)';
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.6)';
+      const rackLen = outerTeeth * state.pitch;
+      const isWave = fixedGear.shapeType === 'wave';
+      const rackH = 34;
+
+      ctx.fillStyle = this.hexToRgba(color, 0.2);
+      ctx.strokeStyle = this.hexToRgba(color, 0.7);
       ctx.lineWidth = 2;
+
       ctx.beginPath();
-      ctx.roundRect(-rackLen / 2, -rackH / 2, rackLen, rackH, 6);
+      if (isWave) {
+        for (let x = -rackLen / 2; x <= rackLen / 2; x += 5) {
+          const y = 18 * Math.sin(x / 35);
+          if (x === -rackLen / 2) ctx.moveTo(x, y);
+          else ctx.lineTo(x, y);
+        }
+        for (let x = rackLen / 2; x >= -rackLen / 2; x -= 5) {
+          const y = 18 * Math.sin(x / 35) + rackH;
+          ctx.lineTo(x, y);
+        }
+      } else {
+        ctx.roundRect(-rackLen / 2, -rackH / 2, rackLen, rackH, 6);
+      }
+      ctx.closePath();
       ctx.fill();
       ctx.stroke();
 
-      ctx.strokeStyle = 'rgba(251, 191, 36, 0.7)';
+      // Dents
+      ctx.strokeStyle = this.hexToRgba(color, 0.85);
       ctx.lineWidth = 1.2;
-      const numTeeth = fixedGear.innerTeeth || 150;
-      const pitch = rackLen / numTeeth;
-      for (let i = 0; i <= numTeeth; i++) {
+      const pitch = rackLen / outerTeeth;
+      for (let i = 0; i <= outerTeeth; i++) {
         const x = -rackLen / 2 + i * pitch;
+        const yTop = isWave ? 18 * Math.sin(x / 35) : -rackH / 2;
         ctx.beginPath();
-        ctx.moveTo(x, -rackH / 2);
-        ctx.lineTo(x, -rackH / 2 - 6);
+        ctx.moveTo(x, yTop);
+        ctx.lineTo(x, yTop - 5);
         ctx.stroke();
       }
       ctx.restore();
       return;
     }
 
-    const innerR = baseR;
-    const outerR = baseR + 36;
-
+    // Anneaux et cadres fermés (circulaires ou formes non rondes)
     ctx.shadowColor = paperTheme.dark ? 'rgba(0,0,0,0.6)' : 'rgba(0,0,0,0.12)';
     ctx.shadowBlur = 12;
     ctx.shadowOffsetY = 4;
 
+    // Corps de l'anneau : découpe du trou intérieur et tracé de la bordure extérieure
     ctx.beginPath();
-    ctx.arc(0, 0, outerR, 0, Math.PI * 2, false);
-    ctx.arc(0, 0, innerR, 0, Math.PI * 2, true);
-    ctx.fillStyle = paperTheme.dark ? 'rgba(56, 189, 248, 0.12)' : 'rgba(56, 189, 248, 0.18)';
+    const steps = 120;
+
+    // Contour extérieur (sens horaire)
+    for (let i = 0; i <= steps; i++) {
+      const theta = (i * 2 * Math.PI) / steps;
+      const rOut = getRingLocalRadius(fixedGear, theta, outerR);
+      const x = rOut * Math.cos(theta);
+      const y = rOut * Math.sin(theta);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+
+    // Découpe intérieure (sens anti-horaire pour créer le trou)
+    for (let i = steps; i >= 0; i--) {
+      const theta = (i * 2 * Math.PI) / steps;
+      const rIn = getRingLocalRadius(fixedGear, theta, innerR);
+      const x = rIn * Math.cos(theta);
+      const y = rIn * Math.sin(theta);
+      ctx.lineTo(x, y);
+    }
+    ctx.closePath();
+
+    ctx.fillStyle = paperTheme.dark ? this.hexToRgba(color, 0.14) : this.hexToRgba(color, 0.22);
     ctx.fill();
 
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.45)';
+    // Bordures extérieure et intérieure
+    ctx.strokeStyle = this.hexToRgba(color, 0.5);
     ctx.lineWidth = 2;
-    ctx.beginPath();
-    ctx.arc(0, 0, outerR, 0, Math.PI * 2);
     ctx.stroke();
 
-    // Dents intérieures
-    const teethCount = fixedGear.innerTeeth || 96;
-    ctx.strokeStyle = 'rgba(56, 189, 248, 0.65)';
-    ctx.lineWidth = 1.5;
-
-    for (let i = 0; i < teethCount; i++) {
-      const angle = (i * 2 * Math.PI) / teethCount;
-      const rInner = getRingLocalRadius(fixedGear, angle, innerR);
-      const x1 = rInner * Math.cos(angle);
-      const y1 = rInner * Math.sin(angle);
-      const x2 = (rInner + 5) * Math.cos(angle);
-      const y2 = (rInner + 5) * Math.sin(angle);
+    // Dents intérieures (pointant vers l'intérieur pour l'hypotrochoïde)
+    ctx.strokeStyle = this.hexToRgba(color, 0.7);
+    ctx.lineWidth = 1.3;
+    for (let i = 0; i < innerTeeth; i++) {
+      const angle = (i * 2 * Math.PI) / innerTeeth;
+      const rIn = getRingLocalRadius(fixedGear, angle, innerR);
+      const x1 = rIn * Math.cos(angle);
+      const y1 = rIn * Math.sin(angle);
+      const x2 = (rIn + 4.5) * Math.cos(angle);
+      const y2 = (rIn + 4.5) * Math.sin(angle);
 
       ctx.beginPath();
       ctx.moveTo(x1, y1);
@@ -372,20 +403,36 @@ export class CanvasRenderer {
       ctx.stroke();
     }
 
-    // Inscription gravée
-    ctx.fillStyle = paperTheme.dark ? 'rgba(255, 255, 255, 0.45)' : 'rgba(0, 0, 0, 0.35)';
+    // Dents extérieures (pointant vers l'extérieur pour l'épitrochoïde)
+    for (let i = 0; i < outerTeeth; i++) {
+      const angle = (i * 2 * Math.PI) / outerTeeth;
+      const rOut = getRingLocalRadius(fixedGear, angle, outerR);
+      const x1 = rOut * Math.cos(angle);
+      const y1 = rOut * Math.sin(angle);
+      const x2 = (rOut - 4.5) * Math.cos(angle);
+      const y2 = (rOut - 4.5) * Math.sin(angle);
+
+      ctx.beginPath();
+      ctx.moveTo(x1, y1);
+      ctx.lineTo(x2, y2);
+      ctx.stroke();
+    }
+
+    // Inscription gravée sur la couronne en acrylique
+    ctx.fillStyle = paperTheme.dark ? 'rgba(255, 255, 255, 0.5)' : 'rgba(0, 0, 0, 0.4)';
     ctx.font = '600 11px Outfit, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
-    ctx.fillText(`${fixedGear.outerTeeth} / ${fixedGear.innerTeeth} DELUXE`, 0, -(innerR + outerR) / 2);
+    ctx.fillText(`${outerTeeth} / ${innerTeeth} DELUXE`, 0, -(innerR + outerR) / 2);
 
     // Points de fixation Spiro-Putty
     for (let deg of [45, 135, 225, 315]) {
       const rad = (deg * Math.PI) / 180;
-      const px = (outerR - 10) * Math.cos(rad);
-      const py = (outerR - 10) * Math.sin(rad);
+      const rP = (innerR + outerR) / 2;
+      const px = rP * Math.cos(rad);
+      const py = rP * Math.sin(rad);
 
-      ctx.fillStyle = 'rgba(59, 130, 246, 0.6)';
+      ctx.fillStyle = 'rgba(59, 130, 246, 0.65)';
       ctx.beginPath();
       ctx.arc(px, py, 6, 0, Math.PI * 2);
       ctx.fill();
@@ -397,10 +444,11 @@ export class CanvasRenderer {
     ctx.restore();
   }
 
+  // Rendu de la roue mobile en acrylique (taille INVARIANTE en hypo et epi)
   renderMobileGearVisual(mobileGear, state, paperTheme) {
     const ctx = this.ctx;
     const center = state.wheelCenter;
-    const r = state.wheelRadius;
+    const r0 = state.wheelRadius; // Strictement constant !
     const angle = state.wheelAngle;
     const color = mobileGear.color || '#ec4899';
 
@@ -416,11 +464,12 @@ export class CanvasRenderer {
     ctx.strokeStyle = this.hexToRgba(color, 0.85);
     ctx.lineWidth = 2;
 
+    // Silhouette exacte de la forme (ronde ou non ronde)
     ctx.beginPath();
-    const steps = 60;
+    const steps = 80;
     for (let i = 0; i <= steps; i++) {
       const psi = (i * 2 * Math.PI) / steps;
-      const localR = getWheelLocalRadius(mobileGear, psi, r);
+      const localR = getWheelLocalRadius(mobileGear, psi, r0);
       const x = localR * Math.cos(psi);
       const y = localR * Math.sin(psi);
       if (i === 0) ctx.moveTo(x, y);
@@ -433,14 +482,14 @@ export class CanvasRenderer {
     ctx.shadowBlur = 0;
     ctx.shadowOffsetY = 0;
 
-    // Dents
+    // Dents d'engrenage le long du périmètre
     const teeth = mobileGear.teeth || 48;
     ctx.strokeStyle = this.hexToRgba(color, 0.95);
     ctx.lineWidth = 1.3;
 
     for (let i = 0; i < teeth; i++) {
       const psi = (i * 2 * Math.PI) / teeth;
-      const localR = getWheelLocalRadius(mobileGear, psi, r);
+      const localR = getWheelLocalRadius(mobileGear, psi, r0);
       const x1 = localR * Math.cos(psi);
       const y1 = localR * Math.sin(psi);
       const x2 = (localR - 4) * Math.cos(psi);
@@ -452,36 +501,37 @@ export class CanvasRenderer {
       ctx.stroke();
     }
 
-    // Évidements circulaires
-    if (r > 35) {
+    // Évidements circulaires ergonomiques
+    if (r0 > 30) {
       ctx.fillStyle = paperTheme.dark ? 'rgba(9, 11, 16, 0.4)' : 'rgba(253, 251, 247, 0.5)';
       ctx.strokeStyle = this.hexToRgba(color, 0.5);
       ctx.lineWidth = 1;
-      const cutoutCount = 3;
+
+      const cutoutCount = mobileGear.shape === 'triangle' ? 3 : (mobileGear.shape === 'square' || mobileGear.shape === 'cross' ? 4 : 3);
       for (let i = 0; i < cutoutCount; i++) {
         const cAngle = (i * 2 * Math.PI) / cutoutCount;
-        const cx = (r * 0.45) * Math.cos(cAngle);
-        const cy = (r * 0.45) * Math.sin(cAngle);
+        const cx = (r0 * 0.45) * Math.cos(cAngle);
+        const cy = (r0 * 0.45) * Math.sin(cAngle);
         ctx.beginPath();
-        ctx.arc(cx, cy, Math.max(5, r * 0.14), 0, Math.PI * 2);
+        ctx.arc(cx, cy, Math.max(4.5, r0 * 0.12), 0, Math.PI * 2);
         ctx.fill();
         ctx.stroke();
       }
     }
 
-    // Numéro de la roue
+    // Nombre de dents gravé
     ctx.fillStyle = paperTheme.dark ? '#ffffff' : '#0f172a';
-    ctx.font = 'bold 13px Outfit, sans-serif';
+    ctx.font = 'bold 12px Outfit, sans-serif';
     ctx.textAlign = 'center';
     ctx.textBaseline = 'middle';
     ctx.fillText(`${mobileGear.teeth}`, 0, 0);
 
-    // Trous de stylet
+    // Trous pour le stylet
     const holes = mobileGear.holes || [];
     const selectedHole = state.selectedHole;
 
     for (const h of holes) {
-      const localR = getWheelLocalRadius(mobileGear, h.angleOffset || 0, r);
+      const localR = getWheelLocalRadius(mobileGear, h.angleOffset || 0, r0);
       const d = localR * h.rRatio;
       const hx = d * Math.cos(h.angleOffset || 0);
       const hy = d * Math.sin(h.angleOffset || 0);
@@ -497,14 +547,14 @@ export class CanvasRenderer {
         ctx.lineWidth = 2.5;
         ctx.stroke();
 
-        ctx.strokeStyle = 'rgba(255, 255, 255, 0.85)';
+        ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.arc(hx, hy, 8, 0, Math.PI * 2);
         ctx.stroke();
       }
 
-      if (r > 30) {
+      if (r0 > 28) {
         ctx.fillStyle = paperTheme.dark ? 'rgba(255,255,255,0.8)' : 'rgba(0,0,0,0.8)';
         ctx.font = '600 8px Outfit, sans-serif';
         ctx.fillText(`${h.number}`, hx + 7, hy - 4);

@@ -2,7 +2,7 @@
 
 import { studioState } from '../state/state.js';
 import { FIXED_GEARS, MOBILE_WHEELS, PEN_STYLES, DELUXE_COLORS, PAPER_THEMES } from '../math/gears.js';
-import { calculateGearState } from '../math/engine.js';
+import { calculateGearState, getWheelLocalRadius } from '../math/engine.js';
 import { CanvasRenderer } from '../render/canvasRenderer.js';
 import { sounds } from '../audio/sound.js';
 import { PRESETS } from '../presets/presets.js';
@@ -14,7 +14,9 @@ export class SpiroStudioApp {
     this.renderer = new CanvasRenderer(this.canvas);
 
     this.activeTab = 'gears'; // 'gears' | 'wheels' | 'pens'
-    this.wheelFilter = 'all'; // 'all' | 'round' | 'shape'
+    this.gearCategoryFilter = 'all'; // 'all' | 'circle' | 'shape' | 'linear'
+    this.wheelCategoryFilter = 'all'; // 'all' | 'round' | 'shape'
+
     this.isDraggingWheel = false;
     this.lastFrameTime = performance.now();
 
@@ -23,7 +25,6 @@ export class SpiroStudioApp {
     this.setupResize();
     this.startAnimationLoop();
 
-    // Rendu initial
     this.updateAllUI();
   }
 
@@ -46,7 +47,6 @@ export class SpiroStudioApp {
     resize();
   }
 
-  // Boucle d'animation principale à 60 FPS
   startAnimationLoop() {
     const loop = (currentTime) => {
       const dt = Math.min((currentTime - this.lastFrameTime) / 1000, 0.1);
@@ -56,20 +56,17 @@ export class SpiroStudioApp {
         const layer = studioState.activeLayer;
         const totalPoints = layer.points.length;
 
-        // Vitesse d'avancement des points selon le multiplicateur
         const pointsPerSec = (totalPoints / 10) * studioState.speed * 2.8;
         const deltaPoints = Math.max(1, Math.round(pointsPerSec * dt));
 
         layer.animatedCount = Math.min(totalPoints, (layer.animatedCount || 0) + deltaPoints);
         studioState.progress = layer.animatedCount / totalPoints;
 
-        // Bruits procéduraux
         if (deltaPoints > 0) {
           sounds.playGearTick(0.06);
           sounds.startPenSound();
         }
 
-        // Fin de la trajectoire
         if (layer.animatedCount >= totalPoints) {
           studioState.isPlaying = false;
           sounds.stopPenSound();
@@ -87,7 +84,6 @@ export class SpiroStudioApp {
     requestAnimationFrame(loop);
   }
 
-  // Rendu de la scène
   requestRender() {
     const activeLayer = studioState.activeLayer;
     let gearState = null;
@@ -107,7 +103,7 @@ export class SpiroStudioApp {
         mode: activeLayer.mode,
         theta: currentTheta,
         phaseOffset: phaseRad,
-        unitScale: 14.0
+        unitScale: 8.5
       });
     }
 
@@ -123,7 +119,6 @@ export class SpiroStudioApp {
   }
 
   bindEvents() {
-    // Écoute des mutations d'état
     studioState.subscribe(() => {
       this.updateMathHUD();
       this.updateLayersUI();
@@ -135,7 +130,6 @@ export class SpiroStudioApp {
       this.requestRender();
     });
 
-    // Contrôles du HUD flottant
     const playBtn = document.getElementById('btn-play-pause');
     if (playBtn) {
       playBtn.addEventListener('click', () => {
@@ -198,7 +192,6 @@ export class SpiroStudioApp {
       });
     }
 
-    // Gestion du Mute Audio
     const muteBtn = document.getElementById('btn-mute');
     if (muteBtn) {
       muteBtn.addEventListener('click', () => {
@@ -208,7 +201,6 @@ export class SpiroStudioApp {
       });
     }
 
-    // Boutons de la barre supérieure
     const presetsBtn = document.getElementById('btn-presets');
     if (presetsBtn) {
       presetsBtn.addEventListener('click', () => {
@@ -246,7 +238,6 @@ export class SpiroStudioApp {
       });
     }
 
-    // Exportation
     const exportPngBtn = document.getElementById('btn-export-png');
     if (exportPngBtn) {
       exportPngBtn.addEventListener('click', () => {
@@ -271,7 +262,6 @@ export class SpiroStudioApp {
       });
     }
 
-    // Sélecteur de papier (thème)
     const paperSelect = document.getElementById('paper-theme-select');
     if (paperSelect) {
       paperSelect.addEventListener('change', (e) => {
@@ -280,7 +270,6 @@ export class SpiroStudioApp {
       });
     }
 
-    // Raccourcis clavier (Espace pour Play/Pause, Entrée pour Instant, C pour figer calque)
     window.addEventListener('keydown', (e) => {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (e.code === 'Space') {
@@ -300,11 +289,9 @@ export class SpiroStudioApp {
       }
     });
 
-    // Interaction manuelle par glisser-déposer sur la roue (Drag & Roll)
     this.bindCanvasInteraction();
   }
 
-  // Permet à l'utilisateur de saisir et faire tourner la roue à la main avec la souris / doigt !
   bindCanvasInteraction() {
     let isInteracting = false;
     let lastAngle = 0;
@@ -443,7 +430,7 @@ export class SpiroStudioApp {
     }
   }
 
-  // Onglet Plateaux Fixes
+  // Onglet Plateaux Fixes avec filtres par catégorie
   renderGearsTab(container) {
     let html = `
       <div class="section-header">
@@ -467,32 +454,49 @@ export class SpiroStudioApp {
 
       <div class="section-header" style="margin-top: 14px;">
         <span class="section-title">Choisir le Plateau Fixe</span>
-        <span class="section-badge">${FIXED_GEARS.length} modèles</span>
+        <div style="display: flex; gap: 4px;">
+          <button class="header-btn gear-cat-btn ${this.gearCategoryFilter === 'all' ? 'btn-primary' : ''}" data-cat="all" style="padding: 2px 7px; font-size: 11px;">Tous (${FIXED_GEARS.length})</button>
+          <button class="header-btn gear-cat-btn ${this.gearCategoryFilter === 'shape' ? 'btn-primary' : ''}" data-cat="shape" style="padding: 2px 7px; font-size: 11px;">Formes Spéciales</button>
+          <button class="header-btn gear-cat-btn ${this.gearCategoryFilter === 'circle' ? 'btn-primary' : ''}" data-cat="circle" style="padding: 2px 7px; font-size: 11px;">Ronds</button>
+        </div>
       </div>
 
       <div class="gears-grid">
     `;
 
-    for (const gear of FIXED_GEARS) {
+    const filteredGears = FIXED_GEARS.filter(g => {
+      if (this.gearCategoryFilter === 'circle') return g.category === 'circle';
+      if (this.gearCategoryFilter === 'shape') return g.category === 'shape';
+      if (this.gearCategoryFilter === 'linear') return g.category === 'linear';
+      return true;
+    });
+
+    for (const gear of filteredGears) {
       const isActive = studioState.fixedGear.id === gear.id;
+      const isShape = gear.category === 'shape';
       html += `
         <div class="gear-card ${isActive ? 'active' : ''}" data-gear-id="${gear.id}" style="--gear-color: ${gear.color}">
           <div class="gear-preview-svg">
-            <svg width="54" height="54" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="44" stroke="${gear.color}" stroke-width="4" fill="${gear.color}22" />
-              <circle cx="50" cy="50" r="28" stroke="${gear.color}" stroke-width="3" stroke-dasharray="3,3" fill="none" />
-              <text x="50" y="54" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
-            </svg>
+            ${this.getFixedGearSVG(gear)}
           </div>
           <div class="gear-card-title">${gear.name}</div>
           <div class="gear-card-desc">${gear.subtitle}</div>
-          <div class="gear-card-badge">${gear.outerTeeth}/${gear.innerTeeth} dents</div>
+          <div class="gear-card-badge" style="${isShape ? 'border-color: var(--accent-rose); color: #f472b6;' : ''}">
+            ${gear.outerTeeth}/${gear.innerTeeth} dents ${isShape ? '• Forme' : ''}
+          </div>
         </div>
       `;
     }
 
     html += `</div>`;
     container.innerHTML = html;
+
+    container.querySelectorAll('.gear-cat-btn').forEach(btn => {
+      btn.addEventListener('click', () => {
+        this.gearCategoryFilter = btn.dataset.cat;
+        this.renderSidebarContent();
+      });
+    });
 
     container.querySelectorAll('.mode-btn').forEach(btn => {
       btn.addEventListener('click', () => {
@@ -509,7 +513,64 @@ export class SpiroStudioApp {
     });
   }
 
-  // Onglet Roues Mobiles & Filtre
+  // Silhouette SVG personnalisée selon la forme du plateau
+  getFixedGearSVG(gear) {
+    const col = gear.color;
+    if (gear.shapeType === 'triangle') {
+      return `
+        <svg width="54" height="54" viewBox="0 0 100 100">
+          <path d="M50,14 C70,14 88,40 88,68 C88,88 68,88 50,88 C32,88 12,88 12,68 C12,40 30,14 50,14 Z" stroke="${col}" stroke-width="4" fill="${col}22"/>
+          <circle cx="50" cy="56" r="18" stroke="${col}" stroke-width="2" stroke-dasharray="2,2" fill="none"/>
+          <text x="50" y="60" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
+        </svg>
+      `;
+    }
+    if (gear.shapeType === 'square') {
+      return `
+        <svg width="54" height="54" viewBox="0 0 100 100">
+          <rect x="16" y="16" width="68" height="68" rx="18" stroke="${col}" stroke-width="4" fill="${col}22"/>
+          <rect x="30" y="30" width="40" height="40" rx="10" stroke="${col}" stroke-width="2" stroke-dasharray="2,2" fill="none"/>
+          <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
+        </svg>
+      `;
+    }
+    if (gear.shapeType === 'heart') {
+      return `
+        <svg width="54" height="54" viewBox="0 0 100 100">
+          <path d="M50,82 C22,62 14,46 14,32 C14,18 24,12 36,12 C44,12 48,16 50,22 C52,16 56,12 64,12 C76,12 86,18 86,32 C86,46 78,62 50,82 Z" stroke="${col}" stroke-width="4" fill="${col}22"/>
+          <text x="50" y="48" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
+        </svg>
+      `;
+    }
+    if (gear.shapeType === 'oval') {
+      return `
+        <svg width="54" height="54" viewBox="0 0 100 100">
+          <ellipse cx="50" cy="50" rx="44" ry="30" stroke="${col}" stroke-width="4" fill="${col}22"/>
+          <ellipse cx="50" cy="50" rx="28" ry="18" stroke="${col}" stroke-width="2" stroke-dasharray="2,2" fill="none"/>
+          <text x="50" y="54" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
+        </svg>
+      `;
+    }
+    if (gear.category === 'linear') {
+      return `
+        <svg width="54" height="54" viewBox="0 0 100 100">
+          <rect x="8" y="38" width="84" height="24" rx="4" stroke="${col}" stroke-width="3" fill="${col}22"/>
+          <line x1="8" y1="38" x2="92" y2="38" stroke="${col}" stroke-width="2" stroke-dasharray="3,3"/>
+          <text x="50" y="54" text-anchor="middle" fill="#ffffff" font-size="13" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
+        </svg>
+      `;
+    }
+    // Cercle standard
+    return `
+      <svg width="54" height="54" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="44" stroke="${col}" stroke-width="4" fill="${col}22"/>
+        <circle cx="50" cy="50" r="28" stroke="${col}" stroke-width="3" stroke-dasharray="3,3" fill="none"/>
+        <text x="50" y="54" text-anchor="middle" fill="#ffffff" font-size="15" font-weight="bold" font-family="Outfit">${gear.innerTeeth}</text>
+      </svg>
+    `;
+  }
+
+  // Onglet Roues Mobiles avec séparation claire Formes Spéciales / Rondes
   renderWheelsTab(container) {
     let html = `
       <div class="section-header">
@@ -543,9 +604,9 @@ export class SpiroStudioApp {
       <div class="section-header" style="margin-top: 14px;">
         <span class="section-title">Choisir la Roue Mobile</span>
         <div style="display: flex; gap: 4px;">
-          <button class="header-btn filter-btn ${this.wheelFilter === 'all' ? 'btn-primary' : ''}" data-filter="all" style="padding: 2px 7px; font-size: 11px;">Toutes</button>
-          <button class="header-btn filter-btn ${this.wheelFilter === 'round' ? 'btn-primary' : ''}" data-filter="round" style="padding: 2px 7px; font-size: 11px;">Rondes</button>
-          <button class="header-btn filter-btn ${this.wheelFilter === 'shape' ? 'btn-primary' : ''}" data-filter="shape" style="padding: 2px 7px; font-size: 11px;">Formes</button>
+          <button class="header-btn wheel-cat-btn ${this.wheelCategoryFilter === 'all' ? 'btn-primary' : ''}" data-filter="all" style="padding: 2px 7px; font-size: 11px;">Toutes (${MOBILE_WHEELS.length})</button>
+          <button class="header-btn wheel-cat-btn ${this.wheelCategoryFilter === 'shape' ? 'btn-primary' : ''}" data-filter="shape" style="padding: 2px 7px; font-size: 11px; color: #f472b6;">Formes Spéciales (9)</button>
+          <button class="header-btn wheel-cat-btn ${this.wheelCategoryFilter === 'round' ? 'btn-primary' : ''}" data-filter="round" style="padding: 2px 7px; font-size: 11px;">Rondes (14)</button>
         </div>
       </div>
 
@@ -553,24 +614,24 @@ export class SpiroStudioApp {
     `;
 
     const filteredWheels = MOBILE_WHEELS.filter(w => {
-      if (this.wheelFilter === 'round') return w.shape === 'round';
-      if (this.wheelFilter === 'shape') return w.shape !== 'round';
+      if (this.wheelCategoryFilter === 'round') return w.shape === 'round';
+      if (this.wheelCategoryFilter === 'shape') return w.shape !== 'round';
       return true;
     });
 
     for (const wheel of filteredWheels) {
       const isActive = studioState.mobileGear.id === wheel.id;
+      const isShape = wheel.shape !== 'round';
       html += `
         <div class="gear-card ${isActive ? 'active' : ''}" data-wheel-id="${wheel.id}" style="--gear-color: ${wheel.color}">
           <div class="gear-preview-svg">
-            <svg width="52" height="52" viewBox="0 0 100 100">
-              <circle cx="50" cy="50" r="38" stroke="${wheel.color}" stroke-width="4" stroke-dasharray="2,2" fill="${wheel.color}28" />
-              <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
-            </svg>
+            ${this.getWheelSVG(wheel)}
           </div>
           <div class="gear-card-title">${wheel.name}</div>
-          <div class="gear-card-desc">${wheel.shape === 'round' ? 'Circulaire' : 'Forme Spéciale'}</div>
-          <div class="gear-card-badge">${wheel.holes.length} trous</div>
+          <div class="gear-card-desc">${isShape ? 'Forme Spéciale' : 'Roue Circulaire'}</div>
+          <div class="gear-card-badge" style="${isShape ? 'border-color: var(--accent-rose); color: #f472b6; font-weight: 700;' : ''}">
+            ${wheel.teeth} dents • ${wheel.holes.length} trous
+          </div>
         </div>
       `;
     }
@@ -580,15 +641,13 @@ export class SpiroStudioApp {
 
     this.renderHolePreviewCanvas();
 
-    // Filtre des roues
-    container.querySelectorAll('.filter-btn').forEach(btn => {
+    container.querySelectorAll('.wheel-cat-btn').forEach(btn => {
       btn.addEventListener('click', () => {
-        this.wheelFilter = btn.dataset.filter;
+        this.wheelCategoryFilter = btn.dataset.filter;
         this.renderSidebarContent();
       });
     });
 
-    // Listeners trous
     container.querySelectorAll('.hole-chip-btn').forEach(btn => {
       btn.addEventListener('click', () => {
         const idx = parseInt(btn.dataset.holeIdx, 10);
@@ -597,7 +656,6 @@ export class SpiroStudioApp {
       });
     });
 
-    // Listeners roues
     container.querySelectorAll('.gear-card').forEach(card => {
       card.addEventListener('click', () => {
         const wheel = MOBILE_WHEELS.find(w => w.id === card.dataset.wheelId);
@@ -606,6 +664,82 @@ export class SpiroStudioApp {
     });
   }
 
+  // Silhouette SVG personnalisée selon la forme de la roue mobile
+  getWheelSVG(wheel) {
+    const col = wheel.color;
+    if (wheel.shape === 'triangle') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <path d="M50,14 C72,14 88,44 88,68 C88,86 68,86 50,86 C32,86 12,86 12,68 C12,44 28,14 50,14 Z" stroke="${col}" stroke-width="4" fill="${col}28"/>
+          <text x="50" y="60" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'oval') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <ellipse cx="50" cy="50" rx="44" ry="26" stroke="${col}" stroke-width="4" stroke-dasharray="2,2" fill="${col}28"/>
+          <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'bar') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <rect x="12" y="36" width="76" height="28" rx="14" stroke="${col}" stroke-width="4" fill="${col}28"/>
+          <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'cross') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <path d="M38,14 H62 V38 H86 V62 H62 V86 H38 V62 H14 V38 H38 Z" stroke="${col}" stroke-width="3" fill="${col}28"/>
+          <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'square') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <rect x="20" y="20" width="60" height="60" rx="14" stroke="${col}" stroke-width="4" fill="${col}28"/>
+          <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="18" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'heart') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <path d="M50,82 C22,62 14,46 14,32 C14,18 24,12 36,12 C44,12 48,16 50,22 C52,16 56,12 64,12 C76,12 86,18 86,32 C86,46 78,62 50,82 Z" stroke="${col}" stroke-width="4" fill="${col}28"/>
+          <text x="50" y="48" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'star') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <polygon points="50,12 62,38 90,38 68,54 76,82 50,64 24,82 32,54 10,38 38,38" stroke="${col}" stroke-width="3" fill="${col}28"/>
+          <text x="50" y="56" text-anchor="middle" fill="#ffffff" font-size="14" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    if (wheel.shape === 'shuttle') {
+      return `
+        <svg width="52" height="52" viewBox="0 0 100 100">
+          <path d="M14,50 Q50,18 86,50 Q50,82 14,50 Z" stroke="${col}" stroke-width="4" fill="${col}28"/>
+          <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="16" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+        </svg>
+      `;
+    }
+    return `
+      <svg width="52" height="52" viewBox="0 0 100 100">
+        <circle cx="50" cy="50" r="38" stroke="${col}" stroke-width="4" stroke-dasharray="2,2" fill="${col}28"/>
+        <text x="50" y="55" text-anchor="middle" fill="#ffffff" font-size="20" font-weight="bold" font-family="Outfit">${wheel.teeth}</text>
+      </svg>
+    `;
+  }
+
+  // Diagramme interactif du trou sur la forme réelle de la roue active
   renderHolePreviewCanvas() {
     const canvas = document.getElementById('hole-preview-canvas');
     if (!canvas) return;
@@ -621,12 +755,23 @@ export class SpiroStudioApp {
     ctx.save();
     ctx.translate(w / 2, h / 2);
 
-    const r = Math.min(w, h) * 0.42;
+    const r0 = Math.min(w, h) * 0.40;
     ctx.fillStyle = `${wheel.color}22`;
-    ctx.strokeStyle = `${wheel.color}88`;
+    ctx.strokeStyle = `${wheel.color}aa`;
     ctx.lineWidth = 2;
+
+    // Tracé de la silhouette exacte de la roue
     ctx.beginPath();
-    ctx.arc(0, 0, r, 0, Math.PI * 2);
+    const steps = 60;
+    for (let i = 0; i <= steps; i++) {
+      const psi = (i * 2 * Math.PI) / steps;
+      const localR = getWheelLocalRadius(wheel, psi, r0);
+      const x = localR * Math.cos(psi);
+      const y = localR * Math.sin(psi);
+      if (i === 0) ctx.moveTo(x, y);
+      else ctx.lineTo(x, y);
+    }
+    ctx.closePath();
     ctx.fill();
     ctx.stroke();
 
@@ -638,7 +783,8 @@ export class SpiroStudioApp {
 
     for (let i = 0; i < holes.length; i++) {
       const hole = holes[i];
-      const dist = r * hole.rRatio;
+      const localR = getWheelLocalRadius(wheel, hole.angleOffset || 0, r0);
+      const dist = localR * hole.rRatio;
       const angle = hole.angleOffset || 0;
       const x = dist * Math.cos(angle);
       const y = dist * Math.sin(angle);
@@ -669,7 +815,6 @@ export class SpiroStudioApp {
     ctx.restore();
   }
 
-  // Onglet Stylos & Encres
   renderPensTab(container) {
     let html = `
       <div class="section-header">

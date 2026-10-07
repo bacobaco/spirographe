@@ -1,17 +1,18 @@
-// Définition de tous les plateaux fixes et roues mobiles du Spirographe Deluxe
+// Catalogue complet des plateaux fixes et roues mobiles du Spirographe Deluxe
 
 export const FIXED_GEARS = [
+  // ANNEAUX RONDS CLASSIQUES
   {
     id: 'ring-144-96',
     name: 'Anneau Deluxe 144 / 96',
-    subtitle: 'Le grand anneau classique Deluxe',
+    subtitle: 'Grand anneau classique officiel',
     category: 'circle',
     outerTeeth: 144,
     innerTeeth: 96,
     defaultTeeth: 96,
     icon: 'circle-ring',
     color: '#38bdf8',
-    description: 'Anneau standard du coffret Deluxe. Idéal pour les rosettes à 8, 12, 16 ou 24 pétales.'
+    description: 'Anneau standard du coffret Deluxe. Dents intérieures: 96, extérieures: 144.'
   },
   {
     id: 'ring-150-105',
@@ -23,7 +24,7 @@ export const FIXED_GEARS = [
     defaultTeeth: 105,
     icon: 'circle-ring',
     color: '#a78bfa',
-    description: 'Anneau avec 105 dents internes (multiple de 7 et 5) pour de somptueuses étoiles à 5 et 7 branches.'
+    description: 'Multiple de 7 et 5 (105 dents internes) pour des étoiles à 5 et 7 branches.'
   },
   {
     id: 'ring-180-120',
@@ -35,58 +36,114 @@ export const FIXED_GEARS = [
     defaultTeeth: 120,
     icon: 'circle-ring',
     color: '#34d399',
-    description: 'Grand plateau permettant une précision maximale et des rosaces grandioses.'
+    description: 'Plateau étendu permettant une précision maximale et des rosaces grandioses.'
+  },
+
+  // FORMES NON RONDES : PLATEAUX & CADRES SPÉCIAUX
+  {
+    id: 'ring-oval-144',
+    name: 'Plateau Ovale / Stade 144/96',
+    subtitle: 'Piste allongée pour médaillons ovales',
+    category: 'shape',
+    shapeType: 'oval',
+    outerTeeth: 144,
+    innerTeeth: 96,
+    defaultTeeth: 96,
+    icon: 'oval-ring',
+    color: '#f472b6',
+    description: 'Anneau étiré produisant des motifs elliptiques asymétriques et des couronnes baroques.'
   },
   {
+    id: 'ring-triangle-120',
+    name: 'Plateau Triangle Deltoïde 120/84',
+    subtitle: 'Cadre triangulaire à 3 courbures',
+    category: 'shape',
+    shapeType: 'triangle',
+    outerTeeth: 120,
+    innerTeeth: 84,
+    defaultTeeth: 84,
+    icon: 'triangle-ring',
+    color: '#06b6d4',
+    description: 'Cadre fixe triangulaire inspiré des formes Reuleaux pour arabesques trilobées.'
+  },
+  {
+    id: 'ring-square-128',
+    name: 'Plateau Carré / Losange 128/96',
+    subtitle: 'Cadre quadrangulaire à 4 sommets',
+    category: 'shape',
+    shapeType: 'square',
+    outerTeeth: 128,
+    innerTeeth: 96,
+    defaultTeeth: 96,
+    icon: 'square-ring',
+    color: '#eab308',
+    description: 'Anneau fixe carré produisant des rosaces cruciformes et des mandalas à 4 ou 8 axes.'
+  },
+  {
+    id: 'ring-heart-120',
+    name: 'Plateau Cœur Romantique 120/80',
+    subtitle: 'Piste asymétrique en cœur',
+    category: 'shape',
+    shapeType: 'heart',
+    outerTeeth: 120,
+    innerTeeth: 80,
+    defaultTeeth: 80,
+    icon: 'heart-ring',
+    color: '#f43f5e',
+    description: 'Forme de cœur produisant des trajectoires asymétriques douces et des spirales d\'amour.'
+  },
+  {
+    id: 'ring-clover-120',
+    name: 'Plateau Quadrilobe / Trèfle 144/96',
+    subtitle: 'Profil festonné à 4 courbures',
+    category: 'shape',
+    shapeType: 'clover',
+    outerTeeth: 144,
+    innerTeeth: 96,
+    defaultTeeth: 96,
+    icon: 'clover-ring',
+    color: '#fb923c',
+    description: 'Plateau festonné à 4 lobes pour des spirales florales complexes et effets kaléidoscopiques.'
+  },
+
+  // CRÉMAILLÈRES ET RAILS LINÉAIRES
+  {
     id: 'rack-150',
-    name: 'Crémaillère Linéaire 150',
-    subtitle: 'Barre droite pour frises et vagues',
+    name: 'Crémaillère Droite 150',
+    subtitle: 'Rail droit pour cycloïdes et frises',
     category: 'linear',
+    shapeType: 'line',
     outerTeeth: 150,
     innerTeeth: 150,
     defaultTeeth: 150,
     icon: 'rack-line',
     color: '#fbbf24',
-    description: 'Rail droit pour dessiner des cycloïdes, sinusoïdes et rubans géométriques le long d\'une ligne.'
+    description: 'Rail linéaire pour dessiner des cycloïdes, rubans et ondes le long d\'une droite.'
   },
   {
-    id: 'ring-oval-144',
-    name: 'Plateau Stade / Ovale 144',
-    subtitle: 'Piste allongée pour couronnes ovales',
-    category: 'shape',
-    outerTeeth: 144,
-    innerTeeth: 112,
-    defaultTeeth: 112,
-    icon: 'oval-ring',
-    color: '#f472b6',
-    description: 'Anneau étiré produisant des motifs elliptiques asymétriques très élégants.'
-  },
-  {
-    id: 'ring-clover-120',
-    name: 'Plateau Quadrilobe / Trèfle 120',
-    subtitle: 'Profil festonné à 4 courbures',
-    category: 'shape',
-    outerTeeth: 144,
-    innerTeeth: 120,
-    defaultTeeth: 120,
-    icon: 'clover-ring',
-    color: '#fb923c',
-    description: 'Plateau ondulé à 4 lobes pour des spirales florales complexes et effets kaléidoscopiques.'
+    id: 'rack-wave-150',
+    name: 'Crémaillère Ondulée / Vague 150',
+    subtitle: 'Rail sinusoïdal pour vagues géométriques',
+    category: 'linear',
+    shapeType: 'wave',
+    outerTeeth: 150,
+    innerTeeth: 150,
+    defaultTeeth: 150,
+    icon: 'rack-wave',
+    color: '#2dd4bf',
+    description: 'Rail ondulé créant des cycloïdes combinées et des frises sinueuses d\'une grande originalité.'
   }
 ];
 
-// Génération des trous pour une roue ronde
+// Génération ergonomique des trous pour une roue ronde
 function generateRoundHoles(teeth, count = 12) {
   const holes = [];
-  // Le rayon de la roue est proportionnel à teeth
-  // Le premier trou est à ~82% du rayon extérieur, le dernier à ~15%
   for (let i = 1; i <= count; i++) {
-    // Fraction du rayon de 0.85 (trou 1) à 0.15 (dernier trou)
-    const factor = 0.86 - (i - 1) * (0.72 / (count - 1));
+    const factor = 0.86 - (i - 1) * (0.72 / Math.max(1, count - 1));
     holes.push({
       number: i,
       rRatio: Math.max(0.12, factor),
-      angleOffset: ((i - 1) * 22) * (Math.PI / 180), // petite spirale ergonomique comme sur les vraies roues
+      angleOffset: ((i - 1) * 22) * (Math.PI / 180),
       label: i === 1 ? 'Trou 1 (Périphérie)' : (i === count ? `Trou ${i} (Centre)` : `Trou ${i}`)
     });
   }
@@ -94,7 +151,7 @@ function generateRoundHoles(teeth, count = 12) {
 }
 
 export const MOBILE_WHEELS = [
-  // Roues rondes classiques du coffret Deluxe
+  // 14 ROUES RONDES CLASSIQUES
   {
     id: 'wheel-24',
     name: 'Roue 24 dents',
@@ -102,7 +159,7 @@ export const MOBILE_WHEELS = [
     shape: 'round',
     color: '#f43f5e',
     holes: generateRoundHoles(24, 6),
-    description: 'Très petite roue agile produisant des boucles serrées et des étoiles très pointues.'
+    description: 'Très petite roue produisant des boucles serrées et des étoiles très pointues.'
   },
   {
     id: 'wheel-30',
@@ -120,7 +177,7 @@ export const MOBILE_WHEELS = [
     shape: 'round',
     color: '#d946ef',
     holes: generateRoundHoles(32, 9),
-    description: 'Roue tierce parfaite avec l\'anneau 96 : crée une forme triangulaire à 3 branches cuspidées.'
+    description: 'Rapport 1:3 avec l\'anneau 96 : crée une forme triangulaire à 3 branches cuspidées.'
   },
   {
     id: 'wheel-40',
@@ -129,7 +186,7 @@ export const MOBILE_WHEELS = [
     shape: 'round',
     color: '#8b5cf6',
     holes: generateRoundHoles(40, 10),
-    description: 'Roue polyvalente du coffret, produit des motifs à 12 ou 21 sommets selon l\'anneau.'
+    description: 'Roue polyvalente, produit des motifs à 12 ou 21 sommets selon l\'anneau.'
   },
   {
     id: 'wheel-42',
@@ -147,7 +204,7 @@ export const MOBILE_WHEELS = [
     shape: 'round',
     color: '#3b82f6',
     holes: generateRoundHoles(45, 11),
-    description: 'La roue signature du coffret Deluxe pour réaliser la légendaire Fleur de Lotus à 7 pétales.'
+    description: 'La roue signature du coffret Deluxe pour réaliser la Fleur de Lotus à 7 pétales.'
   },
   {
     id: 'wheel-48',
@@ -222,7 +279,7 @@ export const MOBILE_WHEELS = [
     description: 'Rapport 4:5 avec 105 : trace de splendides pentagrammes ultra-détaillés.'
   },
 
-  // Roues de formes spéciales Deluxe
+  // 9 FORMES SPÉCIALES NON RONDES DELUXE
   {
     id: 'wheel-triangle-63',
     name: 'Roue Triangle Deltoïde',
@@ -230,16 +287,16 @@ export const MOBILE_WHEELS = [
     shape: 'triangle',
     color: '#06b6d4',
     holes: [
-      { number: 1, rRatio: 0.88, angleOffset: 0, label: 'Pointe A (Sommet 1)' },
-      { number: 2, rRatio: 0.70, angleOffset: 0, label: 'Bras A (Milieu)' },
-      { number: 3, rRatio: 0.50, angleOffset: 0, label: 'Bras A (Intérieur)' },
-      { number: 4, rRatio: 0.88, angleOffset: (2 * Math.PI) / 3, label: 'Pointe B (Sommet 2)' },
-      { number: 5, rRatio: 0.65, angleOffset: (2 * Math.PI) / 3, label: 'Bras B (Milieu)' },
-      { number: 6, rRatio: 0.88, angleOffset: (4 * Math.PI) / 3, label: 'Pointe C (Sommet 3)' },
-      { number: 7, rRatio: 0.65, angleOffset: (4 * Math.PI) / 3, label: 'Bras C (Milieu)' },
+      { number: 1, rRatio: 0.88, angleOffset: 0, label: 'Sommet 1' },
+      { number: 2, rRatio: 0.68, angleOffset: 0, label: 'Bras 1 Médian' },
+      { number: 3, rRatio: 0.48, angleOffset: 0, label: 'Bras 1 Interne' },
+      { number: 4, rRatio: 0.88, angleOffset: (2 * Math.PI) / 3, label: 'Sommet 2' },
+      { number: 5, rRatio: 0.68, angleOffset: (2 * Math.PI) / 3, label: 'Bras 2 Médian' },
+      { number: 6, rRatio: 0.88, angleOffset: (4 * Math.PI) / 3, label: 'Sommet 3' },
+      { number: 7, rRatio: 0.68, angleOffset: (4 * Math.PI) / 3, label: 'Bras 3 Médian' },
       { number: 8, rRatio: 0.15, angleOffset: 0, label: 'Centre' }
     ],
-    description: 'Pièce spéciale trilobée du coffret. Engendre des figures triangulées et des nœuds celtiques.'
+    description: 'Pièce trilobée du coffret Deluxe. Engendre des nœuds celtiques et figures triangulaires.'
   },
   {
     id: 'wheel-oval-56',
@@ -248,11 +305,11 @@ export const MOBILE_WHEELS = [
     shape: 'oval',
     color: '#8b5cf6',
     holes: [
-      { number: 1, rRatio: 0.85, angleOffset: 0, label: 'Grand Axe Extrémité Nord' },
-      { number: 2, rRatio: 0.65, angleOffset: 0, label: 'Grand Axe Nord' },
-      { number: 3, rRatio: 0.45, angleOffset: 0, label: 'Grand Axe Centre-Nord' },
-      { number: 4, rRatio: 0.85, angleOffset: Math.PI, label: 'Grand Axe Extrémité Sud' },
-      { number: 5, rRatio: 0.65, angleOffset: Math.PI, label: 'Grand Axe Sud' },
+      { number: 1, rRatio: 0.85, angleOffset: 0, label: 'Grand Axe Nord' },
+      { number: 2, rRatio: 0.65, angleOffset: 0, label: 'Grand Axe Nord-Médian' },
+      { number: 3, rRatio: 0.45, angleOffset: 0, label: 'Grand Axe Nord-Interne' },
+      { number: 4, rRatio: 0.85, angleOffset: Math.PI, label: 'Grand Axe Sud' },
+      { number: 5, rRatio: 0.65, angleOffset: Math.PI, label: 'Grand Axe Sud-Médian' },
       { number: 6, rRatio: 0.70, angleOffset: Math.PI / 2, label: 'Petit Axe Est' },
       { number: 7, rRatio: 0.70, angleOffset: (3 * Math.PI) / 2, label: 'Petit Axe Ouest' },
       { number: 8, rRatio: 0.12, angleOffset: 0, label: 'Centre Ovale' }
@@ -266,16 +323,16 @@ export const MOBILE_WHEELS = [
     shape: 'bar',
     color: '#10b981',
     holes: [
-      { number: 1, rRatio: 0.88, angleOffset: 0, label: 'Bout A' },
+      { number: 1, rRatio: 0.88, angleOffset: 0, label: 'Bout A Extérieur' },
       { number: 2, rRatio: 0.70, angleOffset: 0, label: 'Bout A Médian' },
-      { number: 3, rRatio: 0.50, angleOffset: 0, label: 'Section A' },
-      { number: 4, rRatio: 0.30, angleOffset: 0, label: 'Près du centre' },
+      { number: 3, rRatio: 0.50, angleOffset: 0, label: 'Section A Interne' },
+      { number: 4, rRatio: 0.30, angleOffset: 0, label: 'Près du centre A' },
       { number: 5, rRatio: 0.10, angleOffset: 0, label: 'Centre de gravité' },
-      { number: 6, rRatio: 0.30, angleOffset: Math.PI, label: 'Section B' },
-      { number: 7, rRatio: 0.50, angleOffset: Math.PI, label: 'Bout B Médian' },
-      { number: 8, rRatio: 0.88, angleOffset: Math.PI, label: 'Bout B' }
+      { number: 6, rRatio: 0.30, angleOffset: Math.PI, label: 'Près du centre B' },
+      { number: 7, rRatio: 0.50, angleOffset: Math.PI, label: 'Section B Interne' },
+      { number: 8, rRatio: 0.88, angleOffset: Math.PI, label: 'Bout B Extérieur' }
     ],
-    description: 'Bâtonnet denté avec bande linéaire de trous. Crée des hélices et faisceaux géométriques.'
+    description: 'Bâtonnet oblong denté avec bande linéaire de trous. Crée des hélices et faisceaux géométriques.'
   },
   {
     id: 'wheel-cross-64',
@@ -289,12 +346,89 @@ export const MOBILE_WHEELS = [
       { number: 3, rRatio: 0.85, angleOffset: Math.PI / 2, label: 'Branche Nord' },
       { number: 4, rRatio: 0.55, angleOffset: Math.PI / 2, label: 'Branche Nord Interne' },
       { number: 5, rRatio: 0.85, angleOffset: Math.PI, label: 'Branche Ouest' },
-      { number: 6, rRatio: 0.55, angleOffset: Math.PI, label: 'Branche Ouest Interne' },
-      { number: 7, rRatio: 0.85, angleOffset: (3 * Math.PI) / 2, label: 'Branche Sud' },
-      { number: 8, rRatio: 0.55, angleOffset: (3 * Math.PI) / 2, label: 'Branche Sud Interne' },
-      { number: 9, rRatio: 0.15, angleOffset: 0, label: 'Centre Croix' }
+      { number: 6, rRatio: 0.85, angleOffset: (3 * Math.PI) / 2, label: 'Branche Sud' },
+      { number: 7, rRatio: 0.15, angleOffset: 0, label: 'Centre Croix' }
     ],
     description: 'Roue cruciforme à 4 lobes pour des rosaces carrées, étoiles à 8 branches et motifs de cathédrale.'
+  },
+  {
+    id: 'wheel-square-52',
+    name: 'Roue Carrée / Quad',
+    teeth: 52,
+    shape: 'square',
+    color: '#eab308',
+    holes: [
+      { number: 1, rRatio: 0.88, angleOffset: Math.PI / 4, label: 'Coin 1' },
+      { number: 2, rRatio: 0.60, angleOffset: Math.PI / 4, label: 'Diagonale 1' },
+      { number: 3, rRatio: 0.88, angleOffset: (3 * Math.PI) / 4, label: 'Coin 2' },
+      { number: 4, rRatio: 0.88, angleOffset: (5 * Math.PI) / 4, label: 'Coin 3' },
+      { number: 5, rRatio: 0.88, angleOffset: (7 * Math.PI) / 4, label: 'Coin 4' },
+      { number: 6, rRatio: 0.65, angleOffset: 0, label: 'Côté Face' },
+      { number: 7, rRatio: 0.15, angleOffset: 0, label: 'Centre Carré' }
+    ],
+    description: 'Roue quadrangulaire à coins arrondis produisant des étoiles orthogonales géométriques.'
+  },
+  {
+    id: 'wheel-heart-44',
+    name: 'Roue Cœur / Goutte',
+    teeth: 44,
+    shape: 'heart',
+    color: '#f43f5e',
+    holes: [
+      { number: 1, rRatio: 0.85, angleOffset: -Math.PI / 2, label: 'Pointe Basse Cœur' },
+      { number: 2, rRatio: 0.55, angleOffset: -Math.PI / 2, label: 'Axe Central' },
+      { number: 3, rRatio: 0.82, angleOffset: Math.PI / 4, label: 'Lobe Supérieur Droit' },
+      { number: 4, rRatio: 0.82, angleOffset: (3 * Math.PI) / 4, label: 'Lobe Supérieur Gauche' },
+      { number: 5, rRatio: 0.18, angleOffset: 0, label: 'Centre de Gravité' }
+    ],
+    description: 'Roue en forme de cœur produisant des boucles asymétriques poétiques et romantiques.'
+  },
+  {
+    id: 'wheel-star-50',
+    name: 'Roue Étoile 5 Branches',
+    teeth: 50,
+    shape: 'star',
+    color: '#38bdf8',
+    holes: [
+      { number: 1, rRatio: 0.88, angleOffset: 0, label: 'Pointe 1' },
+      { number: 2, rRatio: 0.88, angleOffset: (2 * Math.PI) / 5, label: 'Pointe 2' },
+      { number: 3, rRatio: 0.88, angleOffset: (4 * Math.PI) / 5, label: 'Pointe 3' },
+      { number: 4, rRatio: 0.88, angleOffset: (6 * Math.PI) / 5, label: 'Pointe 4' },
+      { number: 5, rRatio: 0.88, angleOffset: (8 * Math.PI) / 5, label: 'Pointe 5' },
+      { number: 6, rRatio: 0.45, angleOffset: Math.PI / 5, label: 'Creux Interne' },
+      { number: 7, rRatio: 0.15, angleOffset: 0, label: 'Centre Étoile' }
+    ],
+    description: 'Roue stellaire à 5 sommets produisant des rosaces pentagonales denses et étincelantes.'
+  },
+  {
+    id: 'wheel-pentagon-45',
+    name: 'Roue Pentagone Arrondi',
+    teeth: 45,
+    shape: 'pentagon',
+    color: '#a855f7',
+    holes: [
+      { number: 1, rRatio: 0.85, angleOffset: 0, label: 'Sommet A' },
+      { number: 2, rRatio: 0.60, angleOffset: 0, label: 'Rayon A' },
+      { number: 3, rRatio: 0.85, angleOffset: (2 * Math.PI) / 5, label: 'Sommet B' },
+      { number: 4, rRatio: 0.85, angleOffset: (4 * Math.PI) / 5, label: 'Sommet C' },
+      { number: 5, rRatio: 0.15, angleOffset: 0, label: 'Centre Pentagone' }
+    ],
+    description: 'Roue à 5 côtés doux produisant des harmoniques subtiles et des kaléidoscopes à 5 branches.'
+  },
+  {
+    id: 'wheel-shuttle-36',
+    name: 'Roue Fuseau / Navette',
+    teeth: 36,
+    shape: 'shuttle',
+    color: '#0ea5e9',
+    holes: [
+      { number: 1, rRatio: 0.88, angleOffset: 0, label: 'Extrémité Pointe Est' },
+      { number: 2, rRatio: 0.55, angleOffset: 0, label: 'Corps Est' },
+      { number: 3, rRatio: 0.88, angleOffset: Math.PI, label: 'Extrémité Pointe Ouest' },
+      { number: 4, rRatio: 0.55, angleOffset: Math.PI, label: 'Corps Ouest' },
+      { number: 5, rRatio: 0.15, angleOffset: 0, label: 'Centre Fuseau' }
+    ],
+    description: 'Roue fuselée à deux pointes effilées créant des courbes ondulantes en amande.'
   }
 ];
 
@@ -375,12 +509,10 @@ export const PEN_STYLES = [
 ];
 
 export const DELUXE_COLORS = [
-  // Classiques du coffret Deluxe
   { name: 'Bleu Bic Original', hex: '#1d4ed8', category: 'classic' },
   { name: 'Rouge Carmin', hex: '#dc2626', category: 'classic' },
   { name: 'Vert Émeraude', hex: '#059669', category: 'classic' },
   { name: 'Noir Encre de Chine', hex: '#111827', category: 'classic' },
-  // Stylos modernes & néon
   { name: 'Rose Fluo / Magenta', hex: '#f43f5e', category: 'neon' },
   { name: 'Cyan Électrique', hex: '#06b6d4', category: 'neon' },
   { name: 'Violet Cosmique', hex: '#8b5cf6', category: 'vibrant' },
@@ -398,7 +530,6 @@ export const PAPER_THEMES = [
     subtitle: 'Grain fin 180g/m²',
     bgColor: '#fdfbf7',
     gridColor: 'rgba(0, 0, 0, 0.04)',
-    paperTexture: true,
     dark: false
   },
   {
@@ -407,7 +538,6 @@ export const PAPER_THEMES = [
     subtitle: 'Studio Dark Art & Néon',
     bgColor: '#090b10',
     gridColor: 'rgba(255, 255, 255, 0.05)',
-    paperTexture: true,
     dark: true
   },
   {
@@ -416,7 +546,6 @@ export const PAPER_THEMES = [
     subtitle: 'Papier d\'atelier naturel',
     bgColor: '#e3d5be',
     gridColor: 'rgba(92, 64, 41, 0.06)',
-    paperTexture: true,
     dark: false
   },
   {
@@ -425,7 +554,6 @@ export const PAPER_THEMES = [
     subtitle: 'Grille technique cyano',
     bgColor: '#0f2744',
     gridColor: 'rgba(56, 189, 248, 0.12)',
-    paperTexture: false,
     dark: true
   }
 ];
