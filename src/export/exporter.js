@@ -25,25 +25,37 @@ export function exportAsPNG({
   for (const layer of layers) {
     if (layer.visible === false || !layer.points || layer.points.length < 2) continue;
     const pts = layer.points;
+    const baseColor = layer.color || '#1d4ed8';
+    const lineWidth = layer.lineWidth || 1.5;
 
-    ctx.save();
-    ctx.strokeStyle = layer.color || '#1d4ed8';
-    ctx.lineWidth = layer.lineWidth || 1.5;
-    ctx.lineCap = 'round';
-    ctx.lineJoin = 'round';
+    const segments = (layer.colorSegments && layer.colorSegments.length > 0)
+      ? layer.colorSegments
+      : [{ start: 0, end: pts.length, color: baseColor }];
 
-    if (layer.penStyle === 'neon-glow') {
-      ctx.shadowColor = layer.color;
-      ctx.shadowBlur = 14;
+    for (const seg of segments) {
+      const s = Math.min(pts.length, seg.start || 0);
+      const e = Math.min(pts.length, seg.end !== undefined ? seg.end : pts.length);
+      if (e - s < 1) continue;
+
+      ctx.save();
+      ctx.strokeStyle = seg.color || baseColor;
+      ctx.lineWidth = lineWidth;
+      ctx.lineCap = 'round';
+      ctx.lineJoin = 'round';
+
+      if (layer.penStyle === 'neon-glow') {
+        ctx.shadowColor = seg.color || baseColor;
+        ctx.shadowBlur = 14;
+      }
+
+      ctx.beginPath();
+      ctx.moveTo(pts[s].x, pts[s].y);
+      for (let i = s + 1; i < e; i++) {
+        ctx.lineTo(pts[i].x, pts[i].y);
+      }
+      ctx.stroke();
+      ctx.restore();
     }
-
-    ctx.beginPath();
-    ctx.moveTo(pts[0].x, pts[0].y);
-    for (let i = 1; i < pts.length; i++) {
-      ctx.lineTo(pts[i].x, pts[i].y);
-    }
-    ctx.stroke();
-    ctx.restore();
   }
   ctx.restore();
 
@@ -74,18 +86,29 @@ export function exportAsSVG({
     const layer = layers[idx];
     if (layer.visible === false || !layer.points || layer.points.length < 2) continue;
 
-    const color = layer.color || '#1d4ed8';
+    const baseColor = layer.color || '#1d4ed8';
     const lineWidth = layer.lineWidth || 1.5;
     const pts = layer.points;
 
-    let pathD = `M ${(pts[0].x + cx).toFixed(2)} ${(pts[0].y + cy).toFixed(2)}`;
-    for (let i = 1; i < pts.length; i++) {
-      pathD += ` L ${(pts[i].x + cx).toFixed(2)} ${(pts[i].y + cy).toFixed(2)}`;
-    }
+    const segments = (layer.colorSegments && layer.colorSegments.length > 0)
+      ? layer.colorSegments
+      : [{ start: 0, end: pts.length, color: baseColor }];
 
-    svg += `  <g id="layer-${idx + 1}" stroke="${color}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round">\n`;
-    svg += `    <path d="${pathD}" />\n`;
-    svg += `  </g>\n`;
+    for (let sIdx = 0; sIdx < segments.length; sIdx++) {
+      const seg = segments[sIdx];
+      const s = Math.min(pts.length, seg.start || 0);
+      const e = Math.min(pts.length, seg.end !== undefined ? seg.end : pts.length);
+      if (e - s < 1) continue;
+
+      let pathD = `M ${(pts[s].x + cx).toFixed(2)} ${(pts[s].y + cy).toFixed(2)}`;
+      for (let i = s + 1; i < e; i++) {
+        pathD += ` L ${(pts[i].x + cx).toFixed(2)} ${(pts[i].y + cy).toFixed(2)}`;
+      }
+
+      svg += `  <g id="layer-${idx + 1}-seg-${sIdx + 1}" stroke="${seg.color || baseColor}" stroke-width="${lineWidth}" fill="none" stroke-linecap="round" stroke-linejoin="round">\n`;
+      svg += `    <path d="${pathD}" />\n`;
+      svg += `  </g>\n`;
+    }
   }
 
   svg += `</svg>\n`;

@@ -151,14 +151,38 @@ export class CanvasRenderer {
     const points = layer.points;
     if (!points || points.length < 2) return;
 
-    const ctx = this.ctx;
     const count = layer.animatedCount !== undefined ? Math.min(layer.animatedCount, points.length) : points.length;
     if (count < 2) return;
 
     const penStyle = layer.penStyle || 'ballpoint';
-    const color = layer.color || '#1d4ed8';
+    const baseColor = layer.color || '#1d4ed8';
     const lineWidth = layer.lineWidth || 1.5;
 
+    // Découpage en segments de couleur si l'utilisateur a changé de couleur en cours de tracé
+    const segments = (layer.colorSegments && layer.colorSegments.length > 0)
+      ? layer.colorSegments
+      : [{ start: 0, end: Infinity, color: baseColor }];
+
+    for (const seg of segments) {
+      const startIdx = Math.min(count, seg.start || 0);
+      const endIdx = Math.min(count, seg.end !== undefined ? seg.end : count);
+      if (endIdx - startIdx < 1) continue;
+
+      const segColor = seg.color || baseColor;
+      this.renderSegmentStyled({
+        points,
+        startIdx,
+        endIdx,
+        color: segColor,
+        penStyle,
+        lineWidth,
+        totalPoints: points.length
+      });
+    }
+  }
+
+  renderSegmentStyled({ points, startIdx, endIdx, color, penStyle, lineWidth, totalPoints }) {
+    const ctx = this.ctx;
     ctx.save();
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
@@ -168,14 +192,14 @@ export class CanvasRenderer {
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth * 0.8;
         ctx.globalAlpha = 1.0;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
         break;
 
       case 'felt-tip':
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth * 1.6;
         ctx.globalAlpha = 0.82;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
         break;
 
       case 'neon-glow':
@@ -184,28 +208,28 @@ export class CanvasRenderer {
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth * 2.2;
         ctx.globalAlpha = 0.55;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
 
         ctx.shadowBlur = 8;
         ctx.lineWidth = lineWidth * 1.4;
         ctx.globalAlpha = 0.85;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
 
         ctx.shadowBlur = 2;
         ctx.strokeStyle = '#ffffff';
         ctx.lineWidth = Math.max(0.7, lineWidth * 0.45);
         ctx.globalAlpha = 0.95;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
         break;
 
       case 'rainbow':
         ctx.lineWidth = lineWidth * 1.2;
         ctx.globalAlpha = 0.95;
         const step = 4;
-        for (let i = 0; i < count - 1; i += step) {
-          const nextIdx = Math.min(i + step, count - 1);
+        for (let i = startIdx; i < endIdx - 1; i += step) {
+          const nextIdx = Math.min(i + step, endIdx - 1);
           const p1 = points[i];
-          const hue = Math.round((i / points.length) * 360) % 360;
+          const hue = Math.round((i / totalPoints) * 360) % 360;
 
           ctx.strokeStyle = `hsl(${hue}, 95%, 52%)`;
           ctx.beginPath();
@@ -221,8 +245,8 @@ export class CanvasRenderer {
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth;
         ctx.globalAlpha = 0.9;
-        this.drawOffsetPath(points, count, -2.0);
-        this.drawOffsetPath(points, count, 2.0);
+        this.drawOffsetPath(points, endIdx, -2.0, startIdx);
+        this.drawOffsetPath(points, endIdx, 2.0, startIdx);
         break;
 
       case 'metallic-gold':
@@ -231,7 +255,7 @@ export class CanvasRenderer {
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth * 1.3;
         ctx.globalAlpha = 0.95;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
         break;
 
       case 'ballpoint':
@@ -241,27 +265,29 @@ export class CanvasRenderer {
         ctx.strokeStyle = color;
         ctx.lineWidth = lineWidth;
         ctx.globalAlpha = 0.92;
-        this.drawBasicPath(points, count);
+        this.drawBasicPath(points, endIdx, startIdx);
         break;
     }
 
     ctx.restore();
   }
 
-  drawBasicPath(points, count) {
+  drawBasicPath(points, count, start = 0) {
+    if (count <= start) return;
     const ctx = this.ctx;
     ctx.beginPath();
-    ctx.moveTo(points[0].x, points[0].y);
-    for (let i = 1; i < count; i++) {
+    ctx.moveTo(points[start].x, points[start].y);
+    for (let i = start + 1; i < count; i++) {
       ctx.lineTo(points[i].x, points[i].y);
     }
     ctx.stroke();
   }
 
-  drawOffsetPath(points, count, offsetPx) {
+  drawOffsetPath(points, count, offsetPx, start = 0) {
+    if (count <= start) return;
     const ctx = this.ctx;
     ctx.beginPath();
-    for (let i = 0; i < count; i++) {
+    for (let i = start; i < count; i++) {
       const p = points[i];
       const next = points[Math.min(i + 1, count - 1)];
       const dx = next.x - p.x;
@@ -272,7 +298,7 @@ export class CanvasRenderer {
 
       const ox = p.x + nx * offsetPx;
       const oy = p.y + ny * offsetPx;
-      if (i === 0) {
+      if (i === start) {
         ctx.moveTo(ox, oy);
       } else {
         ctx.lineTo(ox, oy);
@@ -542,7 +568,7 @@ export class CanvasRenderer {
 
     for (const h of holes) {
       const localR = getWheelLocalRadius(mobileGear, h.angleOffset || 0, r0);
-      const d = localR * h.rRatio;
+      const d = Math.min(localR * 0.88, localR * (h.rRatio || 0.8));
       const hx = d * Math.cos(h.angleOffset || 0);
       const hy = d * Math.sin(h.angleOffset || 0);
       const isSelected = selectedHole && selectedHole.number === h.number;

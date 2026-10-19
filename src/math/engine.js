@@ -187,24 +187,60 @@ export function calculateGearState({
     // Contact cinématique exact selon le côté
     let wheelCenter;
     let contactPoint;
-    if (!isEpi) {
-      // Roue au-dessus du rail
-      const contactPsi = Math.PI / 2 - wheelAngle;
-      const rContact = getWheelLocalRadius(mobileGear, contactPsi, r0);
-      wheelCenter = {
-        x: xOffset + rContact * (slope / normLen),
-        y: contactY - rContact * (1 / normLen)
-      };
-      contactPoint = { x: xOffset, y: contactY };
+    if (!mobileGear || mobileGear.shape === 'round') {
+      const contactPsi = isEpi ? (-Math.PI / 2 - wheelAngle) : (Math.PI / 2 - wheelAngle);
+      const rContact = r0;
+      if (!isEpi) {
+        wheelCenter = {
+          x: xOffset + rContact * (slope / normLen),
+          y: contactY - rContact * (1 / normLen)
+        };
+        contactPoint = { x: xOffset, y: contactY };
+      } else {
+        wheelCenter = {
+          x: xOffset - rContact * (slope / normLen),
+          y: (contactY + rackH) + rContact * (1 / normLen)
+        };
+        contactPoint = { x: xOffset, y: contactY + rackH };
+      }
     } else {
-      // Roue en dessous du rail
-      const contactPsi = -Math.PI / 2 - wheelAngle;
-      const rContact = getWheelLocalRadius(mobileGear, contactPsi, r0);
-      wheelCenter = {
-        x: xOffset - rContact * (slope / normLen),
-        y: (contactY + rackH) + rContact * (1 / normLen)
-      };
-      contactPoint = { x: xOffset, y: contactY + rackH };
+      // Pour les roues à forme spéciale sur crémaillère : enveloppe globale sans pénétration
+      const SAMPLES = 72;
+      let extremeYRel = !isEpi ? -Infinity : Infinity;
+      let contactBestPsi = 0;
+
+      for (let i = 0; i < SAMPLES; i++) {
+        const psi = (i * 2 * Math.PI) / SAMPLES;
+        const rPsi = getWheelLocalRadius(mobileGear, psi, r0);
+        const worldPsi = wheelAngle + psi;
+        const yRel = rPsi * Math.sin(worldPsi);
+
+        if (!isEpi) {
+          if (yRel > extremeYRel) {
+            extremeYRel = yRel;
+            contactBestPsi = psi;
+          }
+        } else {
+          if (yRel < extremeYRel) {
+            extremeYRel = yRel;
+            contactBestPsi = psi;
+          }
+        }
+      }
+
+      if (!isEpi) {
+        wheelCenter = {
+          x: xOffset,
+          y: contactY - extremeYRel
+        };
+        contactPoint = { x: xOffset, y: contactY };
+      } else {
+        wheelCenter = {
+          x: xOffset,
+          y: (contactY + rackH) - extremeYRel
+        };
+        contactPoint = { x: xOffset, y: contactY + rackH };
+      }
     }
 
     // Position du stylet
@@ -214,17 +250,16 @@ export function calculateGearState({
       y: wheelCenter.y + d_hole * Math.sin(penGlobalAngle)
     };
 
-    // GARANTIE PHYSIQUE ABSOLUE :
-    // Le stylo ne peut JAMAIS pénétrer à l'intérieur du corps plastique du rail !
+    // GARANTIE PHYSIQUE : le stylo ne peut pas pénétrer dans le corps plastique du rail
     if (!isEpi) {
       const surfaceY = isWave ? (rackBaseY + 18 * Math.sin(penPos.x / 35)) : rackBaseY;
-      if (penPos.y > surfaceY - 2.0) {
-        penPos.y = surfaceY - 2.0;
+      if (penPos.y > surfaceY - 0.5) {
+        penPos.y = surfaceY - 0.5;
       }
     } else {
       const bottomSurfaceY = (isWave ? (rackBaseY + 18 * Math.sin(penPos.x / 35)) : rackBaseY) + rackH;
-      if (penPos.y < bottomSurfaceY + 2.0) {
-        penPos.y = bottomSurfaceY + 2.0;
+      if (penPos.y < bottomSurfaceY + 0.5) {
+        penPos.y = bottomSurfaceY + 0.5;
       }
     }
 
@@ -249,11 +284,8 @@ export function calculateGearState({
   const effectiveTheta = theta + phaseOffset;
   const contactR = getRingLocalRadius(fixedGear, effectiveTheta, baseContactR);
 
-  // Point de contact physique sur le plateau fixe
-  const contactPoint = {
-    x: contactR * Math.cos(effectiveTheta),
-    y: contactR * Math.sin(effectiveTheta)
-  };
+  // DIMENSIONS PHYSIQUES STRICTEMENT INVARIANTES :
+  // Le rayon r0 d'une roue mobile plastique ne change JAMAIS entre l'intérieur (Hypo) et l'extérieur (Epi) !
 
   // Rotation sans glissement de la roue
   let wheelAngle;
@@ -265,24 +297,88 @@ export function calculateGearState({
     wheelAngle = effectiveTheta - rollingAngle;
   }
 
-  // Rayon de la roue au point de contact avec le plateau
-  const contactPsi = isEpi ? (effectiveTheta - wheelAngle + Math.PI) : (effectiveTheta - wheelAngle);
-  const rContact = getWheelLocalRadius(mobileGear, contactPsi, r0);
-
-  // Position du centre de la roue :
+  // POSITIONNEMENT DU CENTRE ET CONTACT PHYSIQUE EXACT (SANS AUCUNE PÉNÉTRATION)
   let wheelCenter;
-  if (isEpi) {
-    const centerDist = contactR + rContact;
-    wheelCenter = {
-      x: centerDist * Math.cos(effectiveTheta),
-      y: centerDist * Math.sin(effectiveTheta)
-    };
+  let contactPoint;
+
+  if (fixedGear.category === 'circle' && (!mobileGear || mobileGear.shape === 'round')) {
+    // Cas circulaire classique standard : calcul analytique instantané
+    if (isEpi) {
+      const centerDist = contactR + r0;
+      wheelCenter = {
+        x: centerDist * Math.cos(effectiveTheta),
+        y: centerDist * Math.sin(effectiveTheta)
+      };
+      contactPoint = {
+        x: contactR * Math.cos(effectiveTheta),
+        y: contactR * Math.sin(effectiveTheta)
+      };
+    } else {
+      const centerDist = Math.max(2, contactR - r0);
+      wheelCenter = {
+        x: centerDist * Math.cos(effectiveTheta),
+        y: centerDist * Math.sin(effectiveTheta)
+      };
+      contactPoint = {
+        x: contactR * Math.cos(effectiveTheta),
+        y: contactR * Math.sin(effectiveTheta)
+      };
+    }
   } else {
-    // La roue est strictement à l'intérieur du trou du plateau
-    const centerDist = Math.max(2, contactR - rContact);
-    wheelCenter = {
-      x: centerDist * Math.cos(effectiveTheta),
-      y: centerDist * Math.sin(effectiveTheta)
+    // Cas universel : plateaux ou roues à formes spéciales (triangle, cœur, carré, ovale, croix, étoile...)
+    // Résolution rigoureuse par bissection d'enveloppe radiale garantissant ZERO superposition physique
+    const edgeX = contactR * Math.cos(effectiveTheta);
+    const edgeY = contactR * Math.sin(effectiveTheta);
+    const SAMPLES = 72;
+
+    function evalPenAtFactor(factor) {
+      const cx = factor * edgeX;
+      const cy = factor * edgeY;
+      let maxPen = -Infinity;
+      for (let s = 0; s < SAMPLES; s++) {
+        const psi = (s * 2 * Math.PI) / SAMPLES;
+        const rPsi = getWheelLocalRadius(mobileGear, psi, r0);
+        const wAngle = wheelAngle + psi;
+        const wx = cx + rPsi * Math.cos(wAngle);
+        const wy = cy + rPsi * Math.sin(wAngle);
+        const dist = Math.hypot(wx, wy);
+        const alpha = Math.atan2(wy, wx);
+        const rBound = getRingLocalRadius(fixedGear, alpha, baseContactR);
+        const pen = !isEpi ? (dist - rBound) : (rBound - dist);
+        if (pen > maxPen) maxPen = pen;
+      }
+      return maxPen;
+    }
+
+    if (!isEpi) {
+      // Hypotrochoïde : factor va de 0.0 (origine) à 1.0 (bordure intérieure)
+      let low = 0.0, high = 1.0;
+      for (let iter = 0; iter < 20; iter++) {
+        const mid = (low + high) / 2;
+        if (evalPenAtFactor(mid) > -0.5) high = mid;
+        else low = mid;
+      }
+      wheelCenter = {
+        x: low * edgeX,
+        y: low * edgeY
+      };
+    } else {
+      // Épitrochoïde : factor va de 1.0 (bordure) à 3.5 (extérieur)
+      let low = 1.0, high = 3.5;
+      for (let iter = 0; iter < 20; iter++) {
+        const mid = (low + high) / 2;
+        if (evalPenAtFactor(mid) > -0.5) low = mid;
+        else high = mid;
+      }
+      wheelCenter = {
+        x: high * edgeX,
+        y: high * edgeY
+      };
+    }
+
+    contactPoint = {
+      x: edgeX,
+      y: edgeY
     };
   }
 
@@ -293,24 +389,21 @@ export function calculateGearState({
     y: wheelCenter.y + d_hole * Math.sin(penGlobalAngle)
   };
 
-  // GARANTIE PHYSIQUE ABSOLUE :
-  // Le stylo ne peut JAMAIS dessiner sous le plastique du plateau fixe !
+  // GARANTIE PHYSIQUE SUB-PIXEL : le tracé reste strictly dans la zone de dessin
   const penDist = Math.hypot(penPos.x, penPos.y);
   const penAngle = Math.atan2(penPos.y, penPos.x);
 
   if (!isEpi) {
-    // Mode Hypotrochoïde : le stylo est strictement dans l'ouverture intérieure
     const ringBoundaryAtPen = getRingLocalRadius(fixedGear, penAngle, ringInnerRadius);
-    const maxAllowedDist = ringBoundaryAtPen - 2.0; // Marge physique de 2px
+    const maxAllowedDist = ringBoundaryAtPen - 0.5;
     if (penDist > maxAllowedDist) {
       const scale = maxAllowedDist / (penDist || 1);
       penPos.x *= scale;
       penPos.y *= scale;
     }
   } else {
-    // Mode Épitrochoïde : le stylo est strictement à l'extérieur du plateau
     const ringBoundaryAtPen = getRingLocalRadius(fixedGear, penAngle, ringOuterRadius);
-    const minAllowedDist = ringBoundaryAtPen + 2.0; // Marge physique de 2px
+    const minAllowedDist = ringBoundaryAtPen + 0.5;
     if (penDist < minAllowedDist) {
       const scale = minAllowedDist / (penDist || 1);
       penPos.x *= scale;

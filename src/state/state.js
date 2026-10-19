@@ -19,7 +19,7 @@ export class StudioState {
     this.activeLayer = null;
 
     this.isPlaying = false;
-    this.speed = 1.5;
+    this.speed = 0.8;
     this.progress = 0;
     this.showGears = true;
     this.showGrid = true;
@@ -106,10 +106,32 @@ export class StudioState {
   commitActiveLayer() {
     if (!this.activeLayer) return;
 
-    this.activeLayer.animatedCount = this.activeLayer.points.length;
+    // Ne figer STRICTEMENT que les points qui ont effectivement été tracés !
+    const drawnCount = (this.activeLayer.animatedCount !== undefined)
+      ? Math.min(this.activeLayer.animatedCount, this.activeLayer.points.length)
+      : this.activeLayer.points.length;
+
+    if (drawnCount < 2) return;
+
     this.saveSnapshot();
 
-    this.layers.push({ ...this.activeLayer });
+    // Mettre à jour les segments de couleur pour borner au point figé
+    const colorSegments = this.activeLayer.colorSegments
+      ? this.activeLayer.colorSegments.map(s => ({
+          start: s.start,
+          end: Math.min(drawnCount, s.end !== undefined ? s.end : drawnCount),
+          color: s.color
+        })).filter(s => s.end > s.start)
+      : [{ start: 0, end: drawnCount, color: this.activeLayer.color || this.penColor }];
+
+    const committedLayer = {
+      ...this.activeLayer,
+      points: this.activeLayer.points.slice(0, drawnCount),
+      animatedCount: drawnCount,
+      colorSegments
+    };
+
+    this.layers.push(committedLayer);
     sounds.playSelectSnap();
 
     const nextColor = this.getNextSuggestedColor(this.activeLayer.color);
@@ -224,6 +246,47 @@ export class StudioState {
   setPenColor(colorHex) {
     this.penColor = colorHex;
     if (this.activeLayer) {
+      const drawnCount = (this.activeLayer.animatedCount !== undefined)
+        ? Math.min(this.activeLayer.animatedCount, this.activeLayer.points.length)
+        : 0;
+
+      if (!this.activeLayer.colorSegments || this.activeLayer.colorSegments.length === 0) {
+        this.activeLayer.colorSegments = [{
+          start: 0,
+          end: drawnCount > 2 ? drawnCount : Infinity,
+          color: this.activeLayer.color || colorHex
+        }];
+      }
+
+      // Nettoyer les segments futurs si l'utilisateur est reparti en arrière
+      this.activeLayer.colorSegments = this.activeLayer.colorSegments.filter(s => s.start < drawnCount);
+
+      if (drawnCount > 2) {
+        // Clôturer le dernier segment au point exact actuel
+        if (this.activeLayer.colorSegments.length > 0) {
+          const lastSeg = this.activeLayer.colorSegments[this.activeLayer.colorSegments.length - 1];
+          lastSeg.end = drawnCount;
+        } else {
+          this.activeLayer.colorSegments.push({
+            start: 0,
+            end: drawnCount,
+            color: this.activeLayer.color || colorHex
+          });
+        }
+        // Ouvrir le nouveau segment avec la nouvelle couleur sélectionnée
+        this.activeLayer.colorSegments.push({
+          start: Math.max(0, drawnCount - 1),
+          end: Infinity,
+          color: colorHex
+        });
+      } else {
+        // Au tout début : simple modification de la couleur initiale
+        if (this.activeLayer.colorSegments.length > 0) {
+          this.activeLayer.colorSegments[0].color = colorHex;
+          this.activeLayer.colorSegments[0].end = Infinity;
+        }
+      }
+
       this.activeLayer.color = colorHex;
       this.notify('layerStyleChanged', this.activeLayer);
     }

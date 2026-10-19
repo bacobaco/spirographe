@@ -34,6 +34,8 @@ export class SpiroStudioApp {
     this.renderPresetsModal();
     this.updateLayersUI();
     this.updateMathHUD();
+    this.updateMuteButtonUI();
+    this.updateQuickColorsUI();
   }
 
   setupResize() {
@@ -48,33 +50,59 @@ export class SpiroStudioApp {
   }
 
   startAnimationLoop() {
+    this.lastFrameTime = performance.now();
+    this.pointAccumulator = 0;
+
     const loop = (currentTime) => {
-      const dt = Math.min((currentTime - this.lastFrameTime) / 1000, 0.1);
+      if (!this.lastFrameTime) this.lastFrameTime = currentTime;
+      const rawDt = (currentTime - this.lastFrameTime) / 1000;
       this.lastFrameTime = currentTime;
+      // Protection contre les à-coups de rafraîchissement ou changements d'onglets
+      const dt = Math.max(0, Math.min(rawDt, 0.05));
 
       if (studioState.isPlaying && studioState.activeLayer) {
         const layer = studioState.activeLayer;
         const totalPoints = layer.points.length;
 
-        const pointsPerSec = (totalPoints / 10) * studioState.speed * 2.8;
-        const deltaPoints = Math.max(1, Math.round(pointsPerSec * dt));
+        // Vitesse physique universelle en dents par seconde
+        // Indépendante du rafraîchissement d'écran (60Hz, 120Hz, 144Hz, 240Hz)
+        const stats = layer.stats;
+        const totalTeeth = (stats && stats.totalTeethTraveled) ? stats.totalTeethTraveled : ((stats?.rotationsAroundRing || 1) * 96);
+        
+        // Cadence de référence : 14 dents / seconde à 1.0x (environ 7 secondes par tour d'anneau)
+        const baseTeethPerSec = 14;
+        const teethPerSec = baseTeethPerSec * studioState.speed;
+        const pointsPerTooth = totalPoints / Math.max(1, totalTeeth);
+        const pointsPerSec = teethPerSec * pointsPerTooth;
 
-        layer.animatedCount = Math.min(totalPoints, (layer.animatedCount || 0) + deltaPoints);
-        studioState.progress = layer.animatedCount / totalPoints;
+        this.pointAccumulator += pointsPerSec * dt;
+        const pointsToAdvance = Math.floor(this.pointAccumulator);
 
-        if (deltaPoints > 0) {
-          sounds.playGearTick(0.06);
+        if (pointsToAdvance > 0) {
+          this.pointAccumulator -= pointsToAdvance;
+          const prevCount = layer.animatedCount || 0;
+          layer.animatedCount = Math.min(totalPoints, prevCount + pointsToAdvance);
+          studioState.progress = layer.animatedCount / totalPoints;
+
+          // Clic d'engrenage synchronisé avec chaque dent physique franchie
+          const prevTooth = Math.floor((prevCount / totalPoints) * totalTeeth);
+          const currTooth = Math.floor((layer.animatedCount / totalPoints) * totalTeeth);
+          if (currTooth > prevTooth) {
+            sounds.playGearTick(0.06);
+          }
           sounds.startPenSound();
         }
 
         if (layer.animatedCount >= totalPoints) {
           studioState.isPlaying = false;
+          this.pointAccumulator = 0;
           sounds.stopPenSound();
           this.updatePlayButton();
         }
 
         this.updateHUDProgress();
       } else {
+        this.pointAccumulator = 0;
         sounds.stopPenSound();
       }
 
@@ -92,7 +120,7 @@ export class SpiroStudioApp {
       const fixedGear = FIXED_GEARS.find(g => g.id === activeLayer.fixedGearId) || studioState.fixedGear;
       const mobileGear = MOBILE_WHEELS.find(w => w.id === activeLayer.mobileGearId) || studioState.mobileGear;
 
-      const progress = studioState.progress;
+      const progress = studioState.progress || 0;
       const currentTheta = progress * activeLayer.maxTheta;
       const phaseRad = (activeLayer.phaseOffsetDeg * Math.PI) / 180;
 
@@ -123,6 +151,7 @@ export class SpiroStudioApp {
       this.updateMathHUD();
       this.updateLayersUI();
       this.renderSidebarContent();
+      this.updateQuickColorsUI();
       const paperSelect = document.getElementById('paper-theme-select');
       if (paperSelect && studioState.paperTheme) {
         paperSelect.value = studioState.paperTheme.id;
@@ -133,6 +162,10 @@ export class SpiroStudioApp {
     const playBtn = document.getElementById('btn-play-pause');
     if (playBtn) {
       playBtn.addEventListener('click', () => {
+        if (studioState.activeLayer && (studioState.activeLayer.animatedCount || 0) >= studioState.activeLayer.points.length) {
+          studioState.activeLayer.animatedCount = 0;
+          studioState.progress = 0;
+        }
         studioState.isPlaying = !studioState.isPlaying;
         sounds.ensureContext();
         sounds.playSelectSnap();
@@ -176,10 +209,16 @@ export class SpiroStudioApp {
     }
 
     const speedSlider = document.getElementById('speed-slider');
+    const speedVal = document.getElementById('speed-val');
+    const formatSpeed = (val) => val < 1 ? `${val.toFixed(2)}x` : `${val.toFixed(1)}x`;
+
     if (speedSlider) {
+      speedSlider.value = studioState.speed;
+      if (speedVal) speedVal.textContent = formatSpeed(studioState.speed);
+
       speedSlider.addEventListener('input', (e) => {
         studioState.speed = parseFloat(e.target.value);
-        document.getElementById('speed-val').textContent = `${studioState.speed.toFixed(1)}x`;
+        if (speedVal) speedVal.textContent = formatSpeed(studioState.speed);
       });
     }
 
@@ -194,10 +233,11 @@ export class SpiroStudioApp {
 
     const muteBtn = document.getElementById('btn-mute');
     if (muteBtn) {
+      this.updateMuteButtonUI();
       muteBtn.addEventListener('click', () => {
-        const muted = sounds.toggleMute();
-        muteBtn.classList.toggle('active', !muted);
-        muteBtn.title = muted ? 'Activer le son' : 'Couper le son';
+        sounds.toggleMute();
+        studioState.isMuted = sounds.isMuted;
+        this.updateMuteButtonUI();
       });
     }
 
@@ -274,6 +314,10 @@ export class SpiroStudioApp {
       if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT') return;
       if (e.code === 'Space') {
         e.preventDefault();
+        if (studioState.activeLayer && (studioState.activeLayer.animatedCount || 0) >= studioState.activeLayer.points.length) {
+          studioState.activeLayer.animatedCount = 0;
+          studioState.progress = 0;
+        }
         studioState.isPlaying = !studioState.isPlaying;
         sounds.ensureContext();
         sounds.playSelectSnap();
@@ -289,54 +333,108 @@ export class SpiroStudioApp {
       }
     });
 
+    document.querySelectorAll('.quick-color-dot').forEach(btn => {
+      btn.addEventListener('click', () => {
+        studioState.setPenColor(btn.dataset.hex);
+        sounds.playSelectSnap();
+        this.updateQuickColorsUI();
+        this.renderSidebarContent();
+        this.requestRender();
+      });
+    });
+
     this.bindCanvasInteraction();
+  }
+
+  updateQuickColorsUI() {
+    const currentColor = (studioState.penColor || '#1d4ed8').toLowerCase();
+    document.querySelectorAll('.quick-color-dot').forEach(dot => {
+      const isMatch = dot.dataset.hex.toLowerCase() === currentColor;
+      dot.classList.toggle('active', isMatch);
+    });
   }
 
   bindCanvasInteraction() {
     let isInteracting = false;
     let lastAngle = 0;
+    let lastX = 0;
+    let manualPointAccum = 0;
 
-    const getAngleFromEvent = (e) => {
+    const getPosFromEvent = (e) => {
       const rect = this.canvas.getBoundingClientRect();
       const clientX = e.touches ? e.touches[0].clientX : e.clientX;
       const clientY = e.touches ? e.touches[0].clientY : e.clientY;
       const x = (clientX - rect.left) - rect.width / 2;
       const y = (clientY - rect.top) - rect.height / 2;
-      return Math.atan2(y, x);
+      return { x, y, clientX, clientY, angle: Math.atan2(y, x) };
     };
 
     const onStart = (e) => {
       isInteracting = true;
       sounds.ensureContext();
-      lastAngle = getAngleFromEvent(e);
+      const pos = getPosFromEvent(e);
+      lastAngle = pos.angle;
+      lastX = pos.clientX;
       studioState.isPlaying = false;
       this.updatePlayButton();
+      if (studioState.activeLayer) {
+        manualPointAccum = studioState.activeLayer.animatedCount || 0;
+      }
     };
 
     const onMove = (e) => {
       if (!isInteracting || !studioState.activeLayer) return;
-      const angle = getAngleFromEvent(e);
-      let diff = angle - lastAngle;
-
-      if (diff > Math.PI) diff -= 2 * Math.PI;
-      if (diff < -Math.PI) diff += 2 * Math.PI;
-
-      lastAngle = angle;
-
+      const pos = getPosFromEvent(e);
       const layer = studioState.activeLayer;
-      const angleStep = Math.abs(diff);
+      const totalPoints = layer.points.length;
+      const isLinear = layer.mode === 'rack' || (studioState.fixedGear && studioState.fixedGear.category === 'linear');
 
-      const progressDelta = angleStep / layer.maxTheta;
-      studioState.progress = Math.min(1.0, (studioState.progress || 0) + progressDelta);
-      layer.animatedCount = Math.round(studioState.progress * layer.points.length);
+      let progressDelta = 0;
 
-      sounds.playGearTick(0.08);
+      if (isLinear) {
+        // Frise linéaire sur crémaillère : déplacement continu avec aller-retour naturel
+        const dx = pos.clientX - lastX;
+        lastX = pos.clientX;
+        const rackWidth = (studioState.fixedGear?.outerTeeth || 80) * 8.5;
+        progressDelta = dx / Math.max(100, rackWidth);
+      } else {
+        // Plateaux fermés : rotation angulaire
+        let diff = pos.angle - lastAngle;
+        if (diff > Math.PI) diff -= 2 * Math.PI;
+        if (diff < -Math.PI) diff += 2 * Math.PI;
+        lastAngle = pos.angle;
+
+        progressDelta = diff / Math.max(1, layer.maxTheta);
+      }
+
+      if (Math.abs(progressDelta) < 0.000005) return;
+
+      // Tracé bidirectionnel naturel :
+      // - Tourner en avant (progressDelta > 0) fait avancer le tracé
+      // - Repartir en arrière (progressDelta < 0) fait reculer et effacer le tracé naturellement
+      manualPointAccum += progressDelta * totalPoints;
+
+      // Borner l'accumulateur pour que faire marche arrière réagisse instantanément
+      if (manualPointAccum > totalPoints) manualPointAccum = totalPoints;
+      if (manualPointAccum < 0) manualPointAccum = 0;
+
+      const prevCount = layer.animatedCount || 0;
+      const newCount = Math.max(0, Math.min(totalPoints, Math.round(manualPointAccum)));
+      layer.animatedCount = newCount;
+      studioState.progress = newCount / Math.max(1, totalPoints);
+
+      if (Math.abs(newCount - prevCount) >= 2) {
+        sounds.playGearTick(0.07);
+        sounds.startPenSound();
+      }
+
       this.updateHUDProgress();
       this.requestRender();
     };
 
     const onEnd = () => {
       isInteracting = false;
+      sounds.stopPenSound();
     };
 
     this.canvas.addEventListener('mousedown', onStart);
@@ -366,6 +464,34 @@ export class SpiroStudioApp {
         </svg>
       `;
       playBtn.title = 'Dessiner / Animer (Espace)';
+    }
+  }
+
+  updateMuteButtonUI() {
+    const muteBtn = document.getElementById('btn-mute');
+    if (!muteBtn) return;
+    const isMuted = sounds.isMuted;
+    muteBtn.classList.toggle('muted', isMuted);
+    muteBtn.classList.toggle('active', !isMuted);
+    muteBtn.title = isMuted ? 'Activer le son mécanique (actuellement muet)' : 'Couper le son mécanique';
+
+    if (isMuted) {
+      // Icône Haut-parleur barré (son coupé)
+      muteBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <line x1="23" y1="9" x2="17" y2="15"></line>
+          <line x1="17" y1="9" x2="23" y2="15"></line>
+        </svg>
+      `;
+    } else {
+      // Icône Haut-parleur avec ondes sonores (son actif)
+      muteBtn.innerHTML = `
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5"></polygon>
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"></path>
+        </svg>
+      `;
     }
   }
 
